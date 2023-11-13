@@ -1,0 +1,4 @@
+*.xcframework
+*.zip
+.DS_Store
+fastlane/report.xml
