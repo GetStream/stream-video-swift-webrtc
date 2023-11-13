@@ -9,16 +9,16 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "WebRTC",
-            targets: ["WebRTC"]
+            name: "StreamWebRTC",
+            targets: ["StreamWebRTC"]
         ),
     ],
     dependencies: [ ],
     targets: [
         .binaryTarget(
-            name: "WebRTC",
+            name: "StreamWebRTC",
             url: "https://github.com/GetStream/stream-video-swift-webrtc/releases/download/114.5735.08/StreamWebRTC.zip",
-            checksum: "e979a3731ed3294b66e4a8d9e78633010de70b1bbf4c53a221903fc5fce06e2f"
+            checksum: "6f9f36a4b6dc07b67b7455f36d6de2a1a3154b148b883a869b6b17e17725ab0e"
         ),
     ]
 )

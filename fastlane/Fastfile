@@ -6,113 +6,127 @@ require 'net/http'
 
 old_name = 'WebRTC'
 new_name = 'StreamWebRTC'
+swift_package_path = '../Package.swift'
 
 lane :release do |options|
-  UI.user_error!("You must specify a path to xcframework") unless options[:path].to_s.include?('.xcframework')
   UI.user_error!("You must specify an xcframework version") unless options[:version]
+  UI.user_error!("Tag for version #{options[:version]} already exists!") if git_tag_exists(tag: options[:version])
+  UI.success("Ignore the red warning above. Tag for version #{options[:version]} is alright!")
+
+  sh("rm -rf *.zip")
+  sh("rm -rf *.xcframework")
 
   code_review
+  download_framework(version: options[:version])
+  rename_framework
 
-  Dir.chdir('..') do
-    sh("rm -rf #{new_name}.zip")
-    sh("zip -r #{new_name} #{options[:path]} LICENSE")
-    checksum = sh("swift package compute-checksum #{new_name}.zip").strip
+  sh("ditto -c -k --sequesterRsrc --keepParent #{new_name}.xcframework #{new_name}.zip")
+  checksum = sh("swift package compute-checksum #{new_name}.zip").strip
 
-    file_data = ''
-    File.readlines('Package.swift').each do |line|
-      checksum_pattern = /(checksum: ")[a-z0-9]+(")/
-      url_pattern = %r{(releases/download/)[.0-9]+(/)}
+  file_data = ''
+  File.readlines(swift_package_path).each do |line|
+    checksum_pattern = /(checksum: ")[a-z0-9]+(")/
+    url_pattern = %r{(releases/download/)[.0-9]+(/)}
 
-      formatted_line =
-        if line.match(checksum_pattern)
-          line.gsub(checksum_pattern, "\\1#{checksum}\\2")
-        elsif line.match(url_pattern)
-          line.gsub(url_pattern, "\\1#{options[:version]}\\2")
-        else
-          line
-        end
+    formatted_line =
+      if line.match(checksum_pattern)
+        line.gsub(checksum_pattern, "\\1#{checksum}\\2")
+      elsif line.match(url_pattern)
+        line.gsub(url_pattern, "\\1#{options[:version]}\\2")
+      else
+        line
+      end
 
-      file_data << formatted_line
-    end
-
-    File.open('./Package.swift', 'w') { |file| file << file_data }
-
-    sh('git add -A')
-    sh("git commit -m 'Bump #{version}'")
-    sh('git push')
-
-    github_release = set_github_release(
-      repository_name: 'GetStream/stream-video-swift-webrtc',
-      api_token: ENV.fetch("GITHUB_TOKEN", nil),
-      name: options[:version].to_s,
-      tag_name: options[:version].to_s,
-      description: "Upgrade to WebRTC-SDK v#{options[:version]}",
-      commitish: git_branch,
-      upload_assets: ["#{new_name}.zip"]
-    )
-
-    UI.success("New SPM release available: #{github_release['html_url']}")
+    file_data << formatted_line
   end
+
+  File.open(swift_package_path, 'w') { |file| file << file_data }
+
+  sh('git add -A')
+  UI.user_error!("Not committing changes") unless prompt(text: "Will commit changes. All looking good?", boolean: true)
+  sh("git commit -m 'Bump #{options[:version]}'")
+  UI.user_error!("Not pushing changes") unless prompt(text: "Will push changes. All looking good?", boolean: true)
+  sh('git push')
+
+  github_release = set_github_release(
+    repository_name: 'GetStream/stream-video-swift-webrtc',
+    api_token: ENV.fetch("GITHUB_TOKEN", nil),
+    name: options[:version].to_s,
+    tag_name: options[:version].to_s,
+    description: "Upgrade to WebRTC-SDK v#{options[:version]}\n\nChecksum: #{checksum}",
+    commitish: git_branch,
+    upload_assets: ["fastlane/#{new_name}.zip"]
+  )
+
+  UI.success("New SPM release available: #{github_release['html_url']}")
 end
 
 desc 'Example: bundle exec fastlane rename_framework path:WebRTC.xcframework'
-lane :rename_framework do |options|
-  UI.user_error!("You must specify a path to xcframework") unless options[:path].to_s.include?('.xcframework')
+private_lane :rename_framework do |options|
+  old_framework_path = File.expand_path("#{old_name}.xcframework")
+  new_framework_path = old_framework_path.gsub(/#{old_name}/, new_name)
 
-  Dir.chdir('..') do
-    old_framework_path = File.expand_path(options[:path])
-    new_framework_path = old_framework_path.gsub(/#{old_name}/, new_name)
+  # Rename the framework itself
+  File.rename(old_framework_path, new_framework_path)
 
-    # Rename the framework itself
-    File.rename(old_framework_path, new_framework_path)
+  # Rename all files with the old framework name with the new one
+  ["#{old_name}.framework", "#{old_name}.h", old_name].each do |file_name|
+    Dir.glob("#{new_framework_path}/**/*").each do |old_file_path|
+      next unless File.basename(old_file_path) == file_name
 
-    # Rename all files with the old framework name with the new one
-    ["#{old_name}.framework", "#{old_name}.h", old_name].each do |file_name|
-      Dir.glob("#{new_framework_path}/**/*").each do |old_file_path|
-        next unless File.basename(old_file_path) == file_name
-
-        new_file_path = old_file_path.reverse.sub(old_name.reverse, new_name.reverse).reverse
-        File.rename(old_file_path, new_file_path)
-      end
-    end
-
-    # Replace all occurrences of the old framework name with the new one in the plist and modulemap files
-    Dir.glob(["#{new_framework_path}/**/Info.plist", "#{new_framework_path}/**/module.modulemap"]).each do |file|
-      sh("plutil -convert xml1 #{file}") if file.include?('Info.plist')
-      old_text = File.read(file)
-      new_text = old_text.gsub(/#{old_name}/, new_name)
-      File.open(file, 'w') { |f| f.puts(new_text) } if old_text != new_text
-    end
-
-    # Replace all imports of the old framework with the new one
-    Dir.glob("#{new_framework_path}/**/*.h").each do |file|
-      old_text = File.read(file)
-      new_text = old_text.gsub(/import <#{old_name}/, "import <#{new_name}")
-      File.open(file, 'w') { |f| f.puts(new_text) } if old_text != new_text
-    end
-
-    # Rename the rpath for all the frameworks and update symlinks if required
-    framework_paths = new_framework_path.include?('.xcframework') ? Dir.glob("#{new_framework_path}/**/*.framework") : [new_framework_path]
-    framework_paths.each do |path|
-      Dir.chdir(path) do
-        if File.symlink?(new_name)
-          old_symlink = File.readlink(new_name)
-          new_symlink = old_symlink.reverse.sub(old_name.reverse, new_name.reverse).reverse
-
-          File.delete(new_name)
-          File.symlink(new_symlink, new_name)
-        end
-
-        sh("install_name_tool -id @rpath/#{new_name}.framework/#{new_name} #{new_name}")
-      end
-    end
-
-    # Sign xcframework if required
-    if new_framework_path.include?('.xcframework')
-      team_id = File.read('fastlane/Matchfile').match(/team_id\("(.*)"\)/)[1]
-      sh("codesign --force --timestamp -v --sign 'Apple Distribution: Stream.io Inc (#{team_id})' #{new_framework_path}")
+      new_file_path = old_file_path.reverse.sub(old_name.reverse, new_name.reverse).reverse
+      File.rename(old_file_path, new_file_path)
     end
   end
+
+  # Replace all occurrences of the old framework name with the new one in the plist and modulemap files
+  Dir.glob(["#{new_framework_path}/**/Info.plist", "#{new_framework_path}/**/module.modulemap"]).each do |file|
+    sh("plutil -convert xml1 #{file}") if file.include?('Info.plist')
+    old_text = File.read(file)
+    new_text = old_text.gsub(/#{old_name}/, new_name)
+    File.open(file, 'w') { |f| f.puts(new_text) } if old_text != new_text
+  end
+
+  # Replace all imports of the old framework with the new one
+  Dir.glob("#{new_framework_path}/**/*.h").each do |file|
+    old_text = File.read(file)
+    new_text = old_text.gsub(/import <#{old_name}/, "import <#{new_name}")
+    File.open(file, 'w') { |f| f.puts(new_text) } if old_text != new_text
+  end
+
+  # Rename the rpath for all the frameworks and update symlinks if required
+  framework_paths = new_framework_path.include?('.xcframework') ? Dir.glob("#{new_framework_path}/**/*.framework") : [new_framework_path]
+  framework_paths.each do |path|
+    Dir.chdir(path) do
+      if File.symlink?(new_name)
+        old_symlink = File.readlink(new_name)
+        new_symlink = old_symlink.reverse.sub(old_name.reverse, new_name.reverse).reverse
+
+        File.delete(new_name)
+        File.symlink(new_symlink, new_name)
+      end
+
+      sh("install_name_tool -id @rpath/#{new_name}.framework/#{new_name} #{new_name}")
+    end
+  end
+
+  # Sign xcframework if required
+  if new_framework_path.include?('.xcframework')
+    team_id = File.read('Matchfile').match(/team_id\("(.*)"\)/)[1]
+    sh("codesign --force --timestamp -v --sign 'Apple Distribution: Stream.io Inc (#{team_id})' #{new_framework_path}")
+  end
+end
+
+private_lane :download_framework do |options|
+  UI.user_error!("You must specify an xcframework version") unless options[:version]
+
+  url = "https://github.com/webrtc-sdk/Specs/releases/download/#{options[:version]}/#{old_name}.xcframework.zip"
+  local_file_path = "#{old_name}.xcframework.zip"
+
+  sh("wget '#{url}' -O '#{local_file_path}'")
+
+  # Extract the contents of the zip file
+  sh("unzip '#{local_file_path}'")
 end
 
 lane :code_review do
