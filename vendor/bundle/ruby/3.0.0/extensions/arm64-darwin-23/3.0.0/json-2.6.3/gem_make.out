@@ -1,0 +1,13 @@
+current directory: /Users/ipavlidakis/workspace/stream-video-swift-webrtc/vendor/bundle/ruby/3.0.0/gems/json-2.6.3/ext/json
+/Users/ipavlidakis/.rbenv/versions/3.0.5/bin/ruby -I /Users/ipavlidakis/.rbenv/versions/3.0.5/lib/ruby/3.0.0 -r ./siteconf20240719-71108-5z0a4q.rb extconf.rb
+creating Makefile
+
+current directory: /Users/ipavlidakis/workspace/stream-video-swift-webrtc/vendor/bundle/ruby/3.0.0/gems/json-2.6.3/ext/json
+make DESTDIR\= clean
+
+current directory: /Users/ipavlidakis/workspace/stream-video-swift-webrtc/vendor/bundle/ruby/3.0.0/gems/json-2.6.3/ext/json
+make DESTDIR\=
+make: Nothing to be done for `all'.
+
+current directory: /Users/ipavlidakis/workspace/stream-video-swift-webrtc/vendor/bundle/ruby/3.0.0/gems/json-2.6.3/ext/json
+make DESTDIR\= install

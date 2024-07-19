@@ -235,6 +235,7 @@ GEM
 
 PLATFORMS
   arm64-darwin-21
+  arm64-darwin-23
 
 DEPENDENCIES
   fastlane
@@ -245,4 +246,4 @@ DEPENDENCIES
   rubocop-require_tools
 
 BUNDLED WITH
-   2.3.26
+   2.5.10
