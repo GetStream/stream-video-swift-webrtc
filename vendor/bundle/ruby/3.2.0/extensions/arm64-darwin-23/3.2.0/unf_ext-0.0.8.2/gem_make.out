@@ -1,0 +1,20 @@
+current directory: /Users/ipavlidakis/workspace/stream-video-swift-webrtc/vendor/bundle/ruby/3.2.0/gems/unf_ext-0.0.8.2/ext/unf_ext
+/Users/ipavlidakis/.rbenv/versions/3.2.0/bin/ruby -I /Users/ipavlidakis/.rbenv/versions/3.2.0/lib/ruby/3.2.0 extconf.rb
+checking for -lstdc++... yes
+creating Makefile
+
+current directory: /Users/ipavlidakis/workspace/stream-video-swift-webrtc/vendor/bundle/ruby/3.2.0/gems/unf_ext-0.0.8.2/ext/unf_ext
+make DESTDIR\= sitearchdir\=./.gem.20241122-82362-g7sw31 sitelibdir\=./.gem.20241122-82362-g7sw31 clean
+
+current directory: /Users/ipavlidakis/workspace/stream-video-swift-webrtc/vendor/bundle/ruby/3.2.0/gems/unf_ext-0.0.8.2/ext/unf_ext
+make DESTDIR\= sitearchdir\=./.gem.20241122-82362-g7sw31 sitelibdir\=./.gem.20241122-82362-g7sw31
+compiling unf.cc
+linking shared-object unf_ext.bundle
+ld: warning: ignoring duplicate libraries: '-lc++', '-lruby.3.2'
+
+current directory: /Users/ipavlidakis/workspace/stream-video-swift-webrtc/vendor/bundle/ruby/3.2.0/gems/unf_ext-0.0.8.2/ext/unf_ext
+make DESTDIR\= sitearchdir\=./.gem.20241122-82362-g7sw31 sitelibdir\=./.gem.20241122-82362-g7sw31 install
+/usr/bin/install -c -m 0755 unf_ext.bundle ./.gem.20241122-82362-g7sw31
+
+current directory: /Users/ipavlidakis/workspace/stream-video-swift-webrtc/vendor/bundle/ruby/3.2.0/gems/unf_ext-0.0.8.2/ext/unf_ext
+make DESTDIR\= sitearchdir\=./.gem.20241122-82362-g7sw31 sitelibdir\=./.gem.20241122-82362-g7sw31 clean
