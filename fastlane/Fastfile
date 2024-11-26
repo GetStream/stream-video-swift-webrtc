@@ -15,9 +15,6 @@ lane :release do |options|
   UI.user_error!("Tag for version #{options[:version]} already exists!") if git_tag_exists(tag: options[:version])
   UI.success("Ignore the red warning above. Tag for version #{options[:version]} is alright!")
 
-  sh("rm -rf *.zip")
-  sh("rm -rf *.xcframework")
-
   code_review
 
   xcframework_path = build_xcframework
