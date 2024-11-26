@@ -1,5 +1,5 @@
 Pod::Spec.new do |spec|
-  spec.name         = "WebRTC"
+  spec.name         = "StreamWebRTC"
   spec.version      = "125.6422.06.2"
   spec.summary      = "Stream WebRTC"
   spec.description  = spec.summary
