@@ -8,10 +8,9 @@ github_repo = ENV['GITHUB_REPOSITORY'] || 'GetStream/stream-video-swift-webrtc'
 sdk_name = 'WebRTC'
 modified_sdk_name = 'StreamWebRTC'
 swift_package_path = '../Package.swift'
-podspec_path = 'WebRTC.podspec'
+podspec_path = 'StreamWebRTC.podspec'
 
 lane :release do |options|
-  UI.user_error!("You must specify an xcframework path or livekit option") if options[:xcframework_path].nil? && options[:livekit].nil?
   UI.user_error!("You must specify an xcframework version") unless options[:version]
   UI.user_error!("Tag for version #{options[:version]} already exists!") if git_tag_exists(tag: options[:version])
   UI.success("Ignore the red warning above. Tag for version #{options[:version]} is alright!")
@@ -21,17 +20,17 @@ lane :release do |options|
 
   code_review
 
-  options[:xcframework_path] = download_framework(version: options[:version]) if options[:livekit]
+  xcframework_path = build_xcframework
+  modified_xcframework_path = clone_and_modify_xcframework(file_path: xcframework_path)
 
-  options[:xcframework_path] = unzip_xcframework(file_path: options[:xcframework_path])
+  sign_xcframework(file_path: xcframework_path)
+  sign_xcframework(file_path: modified_xcframework_path)
 
-  options[:xcframework_path] = rename_framework if options[:livekit]
+  zip_xcframework_path = zip_xcframework(file_path: xcframework_path)
+  zip_modified_xcframework_path = zip_xcframework(file_path: modified_xcframework_path)
 
-  sign_xcframework(file_path: options[:xcframework_path])
-
-  options[:xcframework_path] = zip_xcframework(file_path: options[:xcframework_path])
-
-  checksum = sh("swift package compute-checksum #{options[:xcframework_path]}").strip
+  sh("swift package compute-checksum #{zip_xcframework_path}").strip
+  checksum = sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
 
   version_bump_podspec(path: podspec_path, version_number: options[:version])
 
@@ -65,16 +64,21 @@ lane :release do |options|
     sdk_names: [sdk_name],
     version: options[:version],
     changelog: "Upgrade to WebRTC v#{options[:version]}\n\nChecksum: #{checksum}",
-    upload_assets: "fastlane/#{options[:xcframework_path]}"
+    upload_assets: [zip_xcframework_path, modified_xcframework_path]
   )
 end
 
-private_lane :rename_framework do
-  old_framework_path = File.expand_path("#{sdk_name}.xcframework")
+lane :build_xcframework do
+  sh('./build_xcframework.sh')
+  'src/out_ios_libs/WebRTC.xcframework'
+end
+
+private_lane :clone_and_modify_xcframework do |options|
+  old_framework_path = File.expand_path(options[:file_path])
   new_framework_path = old_framework_path.gsub(/#{sdk_name}/, modified_sdk_name)
 
   # Rename the framework itself
-  File.rename(old_framework_path, new_framework_path)
+  sh("cp -R #{old_framework_path} #{new_framework_path}")
 
   # Rename all files with the old framework name with the new one
   ["#{sdk_name}.framework", "#{sdk_name}.h", sdk_name].each do |file_name|
@@ -124,21 +128,6 @@ private_lane :sign_xcframework do |options|
   sh("codesign --force --timestamp -v --sign 'Apple Distribution: Stream.io Inc (#{team_id})' #{options[:file_path]}")
 end
 
-private_lane :download_framework do |options|
-  UI.user_error!("You must specify an xcframework version") unless options[:version]
-
-  url = "https://github.com/webrtc-sdk/Specs/releases/download/#{options[:version]}/#{sdk_name}.xcframework.zip"
-  local_file_path = "#{sdk_name}.xcframework.zip"
-
-  sh("wget '#{url}' -O '#{local_file_path}'")
-  local_file_path
-end
-
-private_lane :unzip_xcframework do |options|
-  sh("unzip '#{options[:file_path]}'")
-  File.basename(options[:file_path]).gsub('.zip', '')
-end
-
 private_lane :zip_xcframework do |options|
   zip_name = "#{options[:file_path]}.zip"
   sh("ditto -c -k --sequesterRsrc --keepParent #{options[:file_path]} #{zip_name}")
@@ -146,5 +135,5 @@ private_lane :zip_xcframework do |options|
 end
 
 lane :code_review do
-  sh('bundle exec rubocop')
+  sh('bundle exec rubocop Fastfile')
 end

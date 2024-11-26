@@ -10,6 +10,7 @@ Pod::Spec.new do |spec|
   spec.social_media_url = "https://getstream.io"
 
   spec.ios.deployment_target = '13.0'
+  spec.osx.deployment_target = '10.14'
 
   spec.source = { http: "https://github.com/GetStream/stream-video-swift-webrtc/releases/download/#{spec.version}/WebRTC.xcframework.zip" }
   spec.vendored_frameworks = "WebRTC.xcframework"

@@ -2,3 +2,7 @@
 *.zip
 .DS_Store
 fastlane/report.xml
+.swiftpm
+.cipd
+.gclient*
+fastlane/src
