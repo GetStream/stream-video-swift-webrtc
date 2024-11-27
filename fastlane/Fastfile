@@ -57,8 +57,9 @@ lane :release do |options|
   sh('git push')
 
   publish_ios_sdk(
+    skip_git_status_check: false,
     github_repo: github_repo,
-    sdk_names: [sdk_name],
+    sdk_names: [modified_sdk_name],
     version: options[:version],
     changelog: "Upgrade to WebRTC v#{options[:version]}\n\nChecksum: #{checksum}",
     upload_assets: [zip_xcframework_path, modified_xcframework_path]
@@ -67,7 +68,7 @@ end
 
 lane :build_xcframework do
   sh('./build_xcframework.sh')
-  'src/out_ios_libs/WebRTC.xcframework'
+  File.expand_path('src/out_ios_libs/WebRTC.xcframework')
 end
 
 private_lane :clone_and_modify_xcframework do |options|
@@ -126,9 +127,9 @@ private_lane :sign_xcframework do |options|
 end
 
 private_lane :zip_xcframework do |options|
-  zip_name = "#{options[:file_path]}.zip"
-  sh("ditto -c -k --sequesterRsrc --keepParent #{options[:file_path]} #{zip_name}")
-  zip_name
+  zip_path = "#{options[:file_path]}.zip"
+  sh("ditto -c -k --sequesterRsrc --keepParent #{options[:file_path]} #{zip_path}")
+  zip_path
 end
 
 lane :code_review do
