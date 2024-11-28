@@ -17,11 +17,12 @@ lane :release do |options|
 
   code_review
 
+  ['*.zip', '*.xcframework'].each { |f| sh("rm -rf #{f}") }
+
   xcframework_path = build_xcframework
   modified_xcframework_path = clone_and_modify_xcframework(file_path: xcframework_path)
 
-  sign_xcframework(file_path: xcframework_path)
-  sign_xcframework(file_path: modified_xcframework_path)
+  [xcframework_path, modified_xcframework_path].each { |path| sign_xcframework(file_path: path) }
 
   zip_xcframework_path = zip_xcframework(file_path: xcframework_path)
   zip_modified_xcframework_path = zip_xcframework(file_path: modified_xcframework_path)
@@ -62,13 +63,16 @@ lane :release do |options|
     sdk_names: [modified_sdk_name],
     version: options[:version],
     changelog: "Upgrade to WebRTC v#{options[:version]}\n\nChecksum: #{checksum}",
-    upload_assets: [zip_xcframework_path, modified_xcframework_path]
+    upload_assets: [zip_xcframework_path, zip_modified_xcframework_path]
   )
 end
 
 lane :build_xcframework do
   sh('./build_xcframework.sh')
-  File.expand_path('src/out_ios_libs/WebRTC.xcframework')
+  current_path = File.expand_path('src/out_ios_libs/WebRTC.xcframework')
+  new_path = "./#{File.basename(current_path)}"
+  FileUtils.mv(current_path, new_path)
+  File.expand_path(new_path)
 end
 
 private_lane :clone_and_modify_xcframework do |options|
