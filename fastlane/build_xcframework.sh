@@ -12,9 +12,6 @@ fi
 rm -rf src
 rm -rf .cipd
 git clone https://github.com/GetStream/webrtc.git src
-cd src
-git checkout patch/m125
-cd ..
 gclient root
 gclient config --spec 'solutions = [
 {
