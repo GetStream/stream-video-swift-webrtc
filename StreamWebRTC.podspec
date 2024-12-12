@@ -2,10 +2,10 @@ Pod::Spec.new do |spec|
   spec.name         = "StreamWebRTC"
   spec.version      = "125.6422.064"
   spec.summary      = "Stream WebRTC"
-  spec.description  = spec.summary
+  spec.description  = "WebRTC pre-compiled library for Darwin."
 
   spec.homepage = "https://getstream.io/video/"
-  spec.license = { type: "BSD-3", file: "LICENSE" }
+  spec.license = { type: 'BSD', file: 'WebRTC.xcframework/LICENSE.md' }
   spec.author = { "getstream.io" => "support@getstream.io" }
   spec.social_media_url = "https://getstream.io"
 
