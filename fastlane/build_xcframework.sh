@@ -11,7 +11,13 @@ fi
 
 rm -rf src
 rm -rf .cipd
-git clone https://github.com/GetStream/webrtc.git src
+
+if [ -n "$1" ]; then
+  git clone -b "$1" https://github.com/GetStream/webrtc.git src
+else
+  git clone https://github.com/GetStream/webrtc.git src
+fi
+
 gclient root
 gclient config --spec 'solutions = [
 {

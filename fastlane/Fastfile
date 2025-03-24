@@ -10,6 +10,16 @@ modified_sdk_name = 'StreamWebRTC'
 swift_package_path = '../Package.swift'
 podspec_path = 'StreamWebRTC.podspec'
 
+lane :code_review do
+  sh('bundle exec rubocop Fastfile')
+end
+
+# Available options:
+# - version: The version number for the release (required)
+# - webrtc_branch: The branch of WebRTC to build from (optional)
+#
+# Example usage:
+# bundle exec fastlane release version:125.6422.065 webrtc_branch:"patch/m125"
 lane :release do |options|
   UI.user_error!("You must specify an xcframework version") unless options[:version]
   UI.user_error!("Tag for version #{options[:version]} already exists!") if git_tag_exists(tag: options[:version])
@@ -19,7 +29,7 @@ lane :release do |options|
 
   ['*.zip', '*.xcframework'].each { |f| sh("rm -rf #{f}") }
 
-  xcframework_path = build_xcframework
+  xcframework_path = build_xcframework(branch: options[:webrtc_branch])
   modified_xcframework_path = clone_and_modify_xcframework(file_path: xcframework_path)
 
   [xcframework_path, modified_xcframework_path].each { |path| sign_xcframework(file_path: path) }
@@ -67,8 +77,8 @@ lane :release do |options|
   )
 end
 
-lane :build_xcframework do
-  sh('./build_xcframework.sh')
+private_lane :build_xcframework do |options|
+  sh("./build_xcframework.sh #{options[:branch]}")
   current_path = File.expand_path('src/out_ios_libs/WebRTC.xcframework')
   new_path = "./#{File.basename(current_path)}"
   FileUtils.mv(current_path, new_path)
@@ -134,8 +144,4 @@ private_lane :zip_xcframework do |options|
   zip_path = "#{options[:file_path]}.zip"
   sh("ditto -c -k --sequesterRsrc --keepParent #{options[:file_path]} #{zip_path}")
   zip_path
-end
-
-lane :code_review do
-  sh('bundle exec rubocop Fastfile')
 end
