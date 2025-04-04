@@ -2,10 +2,10 @@
 
 if ! command -v gclient &> /dev/null; then
   current_dir=$(pwd)
-  mkdir ~/webrtc
-  cd ~/webrtc
+  mkdir $HOME/webrtc
+  cd $HOME/webrtc
   git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
-  export PATH=$PATH:~/webrtc/depot_tools
+  export PATH=$PATH:$HOME/webrtc/depot_tools
   cd $current_dir
 fi
 
@@ -39,5 +39,4 @@ cd src
     is_debug=false \
     use_goma=false \
     use_rtti=false \
-    rtc_libvpx_build_vp9=true \
-    cflags_cc=["-fdebug-prefix-map=$PWD=.", "-g"]
+    rtc_libvpx_build_vp9=true
