@@ -1,0 +1,51 @@
+name: "Publish new release"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The version number for the release"
+        required: true
+      webrtc_branch:
+        description: "The branch of WebRTC to build from"
+        required: true
+        default: "main"
+
+
+jobs:
+  release:
+    name: Publish new release
+    runs-on: macos-15
+    steps:
+      - name: Connect Bot
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.1
+          bundler-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: "Fastlane - Publish Release"
+        env:
+          GITHUB_TOKEN: ${{ secrets.CI_BOT_GITHUB_TOKEN }}
+        run: bundle exec fastlane release version:${{ inputs.version }} webrtc_branch:${{ inputs.webrtc_branch }} --verbose
+
+      - uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: "🎉 The new release has been shipped! 🚢\n\ncc: <!subteam^S05RBQ69U1H>"
+          fields: repo
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

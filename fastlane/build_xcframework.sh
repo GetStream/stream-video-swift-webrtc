@@ -39,4 +39,5 @@ cd src
     is_debug=false \
     use_goma=false \
     use_rtti=false \
-    rtc_libvpx_build_vp9=true
+    rtc_libvpx_build_vp9=true \
+    cflags_cc=["-fdebug-prefix-map=$PWD=.", "-g"]
