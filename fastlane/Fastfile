@@ -27,7 +27,11 @@ lane :release do |options|
 
   code_review
 
-  match(api_key: appstore_api_key, readonly: true)
+  match(
+    api_key: appstore_api_key,
+    readonly: true,
+    app_identifier: 'io.getstream.iOS.VideoDemoApp' # dummy app to get the certificates
+  )
 
   ['*.zip', '*.xcframework'].each { |f| sh("rm -rf #{f}") }
 
