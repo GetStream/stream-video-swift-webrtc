@@ -36,7 +36,11 @@ jobs:
         with:
           python-version: '3.x'
 
-      - run: git credential-luci login
+      - name: Git authentication
+        run: |
+          echo "This step is required to bypass `git credential-luci login`"
+          git config --global credential.helper store
+          echo "https://${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
 
       - name: "Fastlane - Publish Release"
         env:
