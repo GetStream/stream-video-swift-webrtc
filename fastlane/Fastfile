@@ -27,6 +27,8 @@ lane :release do |options|
 
   code_review
 
+  match(api_key: appstore_api_key, readonly: true)
+
   ['*.zip', '*.xcframework'].each { |f| sh("rm -rf #{f}") }
 
   xcframework_path = build_xcframework(branch: options[:webrtc_branch])
@@ -142,4 +144,13 @@ private_lane :zip_xcframework do |options|
   zip_path = "#{options[:file_path]}.zip"
   sh("ditto -c -k --sequesterRsrc --keepParent #{options[:file_path]} #{zip_path}")
   zip_path
+end
+
+private_lane :appstore_api_key do
+  @appstore_api_key ||= app_store_connect_api_key(
+    key_id: 'MT3PRT8TB7',
+    issuer_id: '69a6de96-0738-47e3-e053-5b8c7c11a4d1',
+    key_content: ENV.fetch('APPSTORE_API_KEY', nil),
+    in_house: false
+  )
 end
