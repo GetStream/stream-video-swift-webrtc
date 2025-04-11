@@ -25,6 +25,7 @@ lane :release do |options|
   UI.user_error!("Tag for version #{options[:version]} already exists!") if git_tag_exists(tag: options[:version])
   UI.success("Ignore the red warning above. Tag for version #{options[:version]} is alright!")
 
+  setup_ci if is_ci
   code_review
   match_me
 
