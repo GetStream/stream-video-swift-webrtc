@@ -1,0 +1,15 @@
+current directory: /Users/runner/work/stream-video-swift-webrtc/stream-video-swift-webrtc/vendor/bundle/ruby/3.1.0/gems/nkf-0.2.0/ext/nkf
+/Users/runner/hostedtoolcache/Ruby/3.1.7/arm64/bin/ruby -I /Users/runner/hostedtoolcache/Ruby/3.1.7/arm64/lib/ruby/3.1.0 extconf.rb
+creating Makefile
+
+current directory: /Users/runner/work/stream-video-swift-webrtc/stream-video-swift-webrtc/vendor/bundle/ruby/3.1.0/gems/nkf-0.2.0/ext/nkf
+make DESTDIR\= sitearchdir\=./.gem.20250410-2316-git6xs sitelibdir\=./.gem.20250410-2316-git6xs clean
+
+current directory: /Users/runner/work/stream-video-swift-webrtc/stream-video-swift-webrtc/vendor/bundle/ruby/3.1.0/gems/nkf-0.2.0/ext/nkf
+make DESTDIR\= sitearchdir\=./.gem.20250410-2316-git6xs sitelibdir\=./.gem.20250410-2316-git6xs
+compiling nkf.c
+linking shared-object nkf.bundle
+
+current directory: /Users/runner/work/stream-video-swift-webrtc/stream-video-swift-webrtc/vendor/bundle/ruby/3.1.0/gems/nkf-0.2.0/ext/nkf
+make DESTDIR\= sitearchdir\=./.gem.20250410-2316-git6xs sitelibdir\=./.gem.20250410-2316-git6xs install
+/usr/bin/install -c -m 0755 nkf.bundle ./.gem.20250410-2316-git6xs

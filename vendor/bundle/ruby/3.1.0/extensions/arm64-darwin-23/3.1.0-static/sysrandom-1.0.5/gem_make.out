@@ -1,0 +1,16 @@
+current directory: /Users/runner/work/stream-video-swift-webrtc/stream-video-swift-webrtc/vendor/bundle/ruby/3.1.0/gems/sysrandom-1.0.5/ext/sysrandom
+/Users/runner/hostedtoolcache/Ruby/3.1.7/arm64/bin/ruby -I /Users/runner/hostedtoolcache/Ruby/3.1.7/arm64/lib/ruby/3.1.0 extconf.rb
+creating Makefile
+
+current directory: /Users/runner/work/stream-video-swift-webrtc/stream-video-swift-webrtc/vendor/bundle/ruby/3.1.0/gems/sysrandom-1.0.5/ext/sysrandom
+make DESTDIR\= sitearchdir\=./.gem.20250410-2316-fwu8f8 sitelibdir\=./.gem.20250410-2316-fwu8f8 clean
+
+current directory: /Users/runner/work/stream-video-swift-webrtc/stream-video-swift-webrtc/vendor/bundle/ruby/3.1.0/gems/sysrandom-1.0.5/ext/sysrandom
+make DESTDIR\= sitearchdir\=./.gem.20250410-2316-fwu8f8 sitelibdir\=./.gem.20250410-2316-fwu8f8
+compiling randombytes_sysrandom.c
+compiling sysrandom_ext.c
+linking shared-object sysrandom_ext.bundle
+
+current directory: /Users/runner/work/stream-video-swift-webrtc/stream-video-swift-webrtc/vendor/bundle/ruby/3.1.0/gems/sysrandom-1.0.5/ext/sysrandom
+make DESTDIR\= sitearchdir\=./.gem.20250410-2316-fwu8f8 sitelibdir\=./.gem.20250410-2316-fwu8f8 install
+/usr/bin/install -c -m 0755 sysrandom_ext.bundle ./.gem.20250410-2316-fwu8f8
