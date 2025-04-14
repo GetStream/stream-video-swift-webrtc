@@ -1,6 +1,7 @@
 *.xcframework
 *.zip
 .DS_Store
+vendor/bundle/
 fastlane/report.xml
 .swiftpm
 .cipd

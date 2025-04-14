@@ -1,7 +1,0 @@
-#!/usr/bin/env ruby
-
-require 'bundler/setup'
-require 'rubocop/require_tools'
-require 'pry'
-
-PRY.start
