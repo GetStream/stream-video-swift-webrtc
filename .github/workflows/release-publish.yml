@@ -10,6 +10,11 @@ on:
         description: "The branch of WebRTC to build from"
         required: true
         default: "main"
+      skip_pods:
+        description: "Skip the pods update"
+        required: true
+        type: boolean
+        default: false
 
 jobs:
   release:
@@ -48,7 +53,7 @@ jobs:
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
-        run: bundle exec fastlane release version:${{ inputs.version }} webrtc_branch:${{ inputs.webrtc_branch }} --verbose
+        run: bundle exec fastlane release version:${{ inputs.version }} webrtc_branch:${{ inputs.webrtc_branch }} skip_pods:${{ inputs.skip_pods }} --verbose
 
       - uses: 8398a7/action-slack@v3
         with:
