@@ -10,8 +10,26 @@ modified_sdk_name = 'StreamWebRTC'
 swift_package_path = '../Package.swift'
 podspec_path = 'StreamWebRTC.podspec'
 
+before_all do |lane|
+  if is_ci
+    setup_ci
+    setup_git_config
+  end
+end
+
 lane :code_review do
   sh('bundle exec rubocop Fastfile')
+end
+
+lane :build do |options|
+  code_review
+  match_me
+  ['*.zip', '*.xcframework'].each { |f| sh("rm -rf #{f}") }
+  xcframework_path = build_xcframework(branch: options[:webrtc_branch])
+  modified_xcframework_path = clone_and_modify_xcframework(file_path: xcframework_path)
+  [modified_xcframework_path].each { |path| sign_xcframework(file_path: path) }
+  zip_modified_xcframework_path = zip_xcframework(file_path: modified_xcframework_path)
+  sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
 end
 
 # Available options:
@@ -25,7 +43,6 @@ lane :release do |options|
   UI.user_error!("Tag for version #{options[:version]} already exists!") if git_tag_exists(tag: options[:version])
   UI.success("Ignore the red warning above. Tag for version #{options[:version]} is alright!")
 
-  setup_ci if is_ci
   code_review
   match_me
 

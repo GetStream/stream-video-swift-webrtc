@@ -7,3 +7,4 @@ fastlane/report.xml
 .cipd
 .gclient*
 fastlane/src
+.bundle

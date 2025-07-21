@@ -1,0 +1,52 @@
+name: "Build"
+
+on:
+  workflow_dispatch:
+    inputs:
+      webrtc_branch:
+        description: "The branch of WebRTC to build from"
+        required: true
+        default: "main"
+
+jobs:
+  build:
+    name: Build
+    runs-on: macos-15
+    steps:
+      - name: Connect Bot
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.1
+          bundler-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Git authentication
+        run: |
+          echo "This step is required to bypass `git credential-luci login`"
+          git config --global credential.helper store
+          echo "https://${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
+
+      - name: "Build"
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
+        run: bundle exec fastlane build webrtc_branch:${{ inputs.webrtc_branch }} --verbose
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: xcframework
+          path: fastlane/StreamWebRTC.xcframework.zip
