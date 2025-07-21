@@ -42,7 +42,7 @@ lane :release do |options|
   sh("swift package compute-checksum #{zip_xcframework_path}").strip
   checksum = sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
 
-  version_bump_podspec(path: podspec_path, version_number: options[:version])
+  # version_bump_podspec(path: podspec_path, version_number: options[:version])
 
   file_data = ''
   File.readlines(swift_package_path).each do |line|
@@ -68,6 +68,7 @@ lane :release do |options|
   sh('git push')
 
   publish_ios_sdk(
+    skip_pods: true,
     skip_git_status_check: false,
     github_repo: github_repo,
     sdk_names: [modified_sdk_name],
