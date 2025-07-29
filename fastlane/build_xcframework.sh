@@ -38,5 +38,5 @@ cd src
   --extra-gn-args \
     is_debug=false \
     use_goma=false \
-    use_rtti=false \
+    use_rtti=true \
     rtc_libvpx_build_vp9=true
