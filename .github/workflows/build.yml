@@ -46,6 +46,7 @@ jobs:
         run: bundle exec fastlane build webrtc_branch:${{ inputs.webrtc_branch }} --verbose
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: xcframework
           path: fastlane/StreamWebRTC.xcframework.zip
