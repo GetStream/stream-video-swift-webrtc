@@ -44,6 +44,7 @@ jobs:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
         run: bundle exec fastlane build webrtc_branch:${{ inputs.webrtc_branch }} --verbose
+        timeout-minutes: 120
 
       - uses: actions/upload-artifact@v4
         if: always()

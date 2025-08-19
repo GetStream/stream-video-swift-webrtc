@@ -35,7 +35,7 @@ gclient sync
 cd src
 ./tools_webrtc/ios/build_ios_libs.py \
   --deployment-target 13.0 \
-  ----no-licenses \
+  --no-licenses \
   --extra-gn-args \
     is_debug=false \
     use_goma=false \
