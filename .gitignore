@@ -5,6 +5,7 @@ vendor/bundle/
 fastlane/report.xml
 .swiftpm
 .cipd
+.gcs_entries
 .gclient*
 fastlane/src
 .bundle
