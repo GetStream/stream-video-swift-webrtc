@@ -23,10 +23,13 @@ end
 
 lane :build do |options|
   code_review
-  match_me
+
   ['*.zip', '*.xcframework'].each { |f| sh("rm -rf #{f}") }
   xcframework_path = build_xcframework(branch: options[:webrtc_branch])
   modified_xcframework_path = clone_and_modify_xcframework(file_path: xcframework_path)
+
+  match_me
+
   [modified_xcframework_path].each { |path| sign_xcframework(file_path: path) }
   zip_modified_xcframework_path = zip_xcframework(file_path: modified_xcframework_path)
   sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
@@ -44,12 +47,12 @@ lane :release do |options|
   UI.success("Ignore the red warning above. Tag for version #{options[:version]} is alright!")
 
   code_review
-  match_me
 
   ['*.zip', '*.xcframework'].each { |f| sh("rm -rf #{f}") }
-
   xcframework_path = build_xcframework(branch: options[:webrtc_branch])
   modified_xcframework_path = clone_and_modify_xcframework(file_path: xcframework_path)
+
+  match_me
 
   [xcframework_path, modified_xcframework_path].each { |path| sign_xcframework(file_path: path) }
 

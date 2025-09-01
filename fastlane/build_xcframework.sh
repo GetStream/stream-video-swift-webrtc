@@ -11,6 +11,7 @@ fi
 
 rm -rf src
 rm -rf .cipd
+rm -rf .gcs_entries
 
 if [ -n "$1" ]; then
   git clone -b "$1" https://github.com/GetStream/webrtc.git src
@@ -35,7 +36,6 @@ gclient sync
 cd src
 ./tools_webrtc/ios/build_ios_libs.py \
   --deployment-target 13.0 \
-  --no-licenses \
   --extra-gn-args \
     is_debug=false \
     use_goma=false \
