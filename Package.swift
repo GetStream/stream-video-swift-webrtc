@@ -5,7 +5,8 @@ let package = Package(
     name: "StreamWebRTC",
     platforms: [
       .iOS(.v13),
-      .macOS(.v11)
+      .macOS(.v11),
+      .macCatalyst(.v14)
     ],
     products: [
         .library(
