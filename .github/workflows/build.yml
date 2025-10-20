@@ -49,5 +49,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: xcframework
+          name: StreamWebRTC.xcframework-${{ github.run_id }}
           path: fastlane/StreamWebRTC.xcframework.zip
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: WebRTC.xcframework-${{ github.run_id }}
+          path: fastlane/WebRTC.xcframework.zip
+          retention-days: 7

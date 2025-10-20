@@ -30,9 +30,14 @@ lane :build do |options|
 
   match_me
 
-  [modified_xcframework_path].each { |path| sign_xcframework(file_path: path) }
+  [xcframework_path, modified_xcframework_path].each { |path| sign_xcframework(file_path: path) }
+
+  zip_xcframework_path = zip_xcframework(file_path: xcframework_path)
   zip_modified_xcframework_path = zip_xcframework(file_path: modified_xcframework_path)
-  sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
+  original_checksum = sh("swift package compute-checksum #{zip_xcframework_path}").strip
+  modified_checksum = sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
+  sh("echo 'WebRTC.xcframework checksum: #{original_checksum}'")
+  sh("echo 'StreamWebRTC.xcframework checksum: #{modified_checksum}'")
 end
 
 # Available options:
