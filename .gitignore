@@ -9,3 +9,5 @@ fastlane/report.xml
 .gclient*
 fastlane/
 .bundle
+Gemfile.lock
+Gemfile
