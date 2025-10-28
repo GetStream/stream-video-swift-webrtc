@@ -39,7 +39,11 @@ jobs:
           git config --global credential.helper store
           echo "https://${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
 
-      - name: "Build"
+      - name: Setup Fastlane
+        run: make fastlane
+        timeout-minutes: 10
+
+      - name: Build
         env:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
