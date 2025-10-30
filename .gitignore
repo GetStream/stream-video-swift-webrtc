@@ -9,3 +9,4 @@ fastlane/report.xml
 .gclient*
 fastlane/src
 .bundle
+.build

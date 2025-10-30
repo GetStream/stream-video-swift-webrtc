@@ -18,8 +18,17 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
 
-      - uses: actions/checkout@v4.1.1
+      - name: Checkout release pipeline
+        uses: actions/checkout@v4.1.1
         with:
+          repository: GetStream/stream-webrtc-release-pipeline
+          fetch-depth: 0
+
+      - name: Checkout WebRTC branch
+        uses: actions/checkout@v4.1.1
+        with:
+          repository: GetStream/webrtc
+          ref: ${{ inputs.webrtc_branch }}
           fetch-depth: 0
 
       - name: Set up Ruby
@@ -43,19 +52,17 @@ jobs:
         env:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
-        run: bundle exec fastlane build webrtc_branch:${{ inputs.webrtc_branch }} --verbose
+        run: bundle exec fastlane ios build verbose:true maccatalyst_support:true
         timeout-minutes: 120
 
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: StreamWebRTC.xcframework.zip
-          path: fastlane/StreamWebRTC.xcframework.zip
+          path: .products/StreamWebRTC.xcframework.zip
           retention-days: 7
 
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: WebRTC.xcframework.zip
-          path: fastlane/WebRTC.xcframework.zip
+          path: .products/WebRTC.xcframework.zip
           retention-days: 7
