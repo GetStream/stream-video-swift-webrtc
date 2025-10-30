@@ -18,6 +18,12 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
 
+      - name: Git authentication
+        run: |
+          echo "This step is required to bypass `git credential-luci login`"
+          git config --global credential.helper store
+          echo "https://${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
+
       - name: Checkout release pipeline
         run: |
           git clone git@github.com:GetStream/stream-webrtc-release-pipeline.git fastlane
@@ -38,12 +44,6 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
-
-      - name: Git authentication
-        run: |
-          echo "This step is required to bypass `git credential-luci login`"
-          git config --global credential.helper store
-          echo "https://${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
 
       - name: "Build"
         env:
