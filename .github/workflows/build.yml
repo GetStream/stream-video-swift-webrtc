@@ -55,6 +55,20 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Ensure gclient is available
+        run: |
+          if ! command -v gclient &> /dev/null; then
+            current_dir=$(pwd)
+            mkdir -p "$HOME/webrtc"
+            cd "$HOME/webrtc"
+            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+            export PATH="$PATH:$HOME/webrtc/depot_tools"
+            cd "$current_dir"
+          fi
+          if [ -d "$HOME/webrtc/depot_tools" ]; then
+            echo "$HOME/webrtc/depot_tools" >> "$GITHUB_PATH"
+          fi
+
       - name: "Build"
         env:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
