@@ -19,17 +19,14 @@ jobs:
           ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
 
       - name: Checkout release pipeline
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/GetStream/stream-webrtc-release-pipeline.git fastlane
+          git clone git@github.com:GetStream/stream-webrtc-release-pipeline.git fastlane
 
       - name: Checkout WebRTC branch
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WEBRTC_BRANCH: ${{ inputs.webrtc_branch }}
         run: |
-          git clone --branch "${WEBRTC_BRANCH}" --single-branch https://x-access-token:${GITHUB_TOKEN}@github.com/GetStream/webrtc.git src
+          git clone --branch "${WEBRTC_BRANCH}" --single-branch git@github.com:GetStream/webrtc.git src
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
