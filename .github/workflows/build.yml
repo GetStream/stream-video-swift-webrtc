@@ -72,7 +72,7 @@ jobs:
         env:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
-        run: cd fastlane && bundle install && bundle exec fastlane ios build root:src verbose:true maccatalyst_support:true
+        run: cd fastlane && bundle install && bundle exec fastlane ios build root:../src verbose:true maccatalyst_support:true
         timeout-minutes: 120
 
       - uses: actions/upload-artifact@v4
