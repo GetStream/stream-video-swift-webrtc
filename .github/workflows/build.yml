@@ -54,6 +54,15 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Cache WebRTC build output
+        uses: actions/cache@v4
+        with:
+          path: src/.output
+          key: ${{ runner.os }}-webrtc-output-${{ inputs.webrtc_branch }}-${{ hashFiles('src/.gclient', 'src/DEPS') }}
+          restore-keys: |
+            ${{ runner.os }}-webrtc-output-${{ inputs.webrtc_branch }}-
+            ${{ runner.os }}-webrtc-output-
+
       - name: Ensure gclient is available
         run: |
           if ! command -v gclient &> /dev/null; then
