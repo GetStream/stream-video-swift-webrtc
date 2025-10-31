@@ -18,9 +18,30 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
 
-      - uses: actions/checkout@v4.1.1
+      - name: Git authentication
+        run: |
+          echo "This step is required to bypass `git credential-luci login`"
+          git config --global credential.helper store
+          echo "https://${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
+
+      - name: Checkout release pipeline
+        uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          repository: GetStream/stream-webrtc-release-pipeline
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ssh-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
+          persist-credentials: false
+
+      - name: Checkout WebRTC branch
+        uses: actions/checkout@v5
+        with:
+          repository: GetStream/webrtc
+          ref: ${{ inputs.webrtc_branch }}
+          path: src
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ssh-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
+          persist-credentials: false
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -33,29 +54,44 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Git authentication
+      - name: Cache WebRTC build output
+        uses: actions/cache@v4
+        with:
+          path: src/.output
+          key: ${{ runner.os }}-webrtc-output-${{ inputs.webrtc_branch }}-${{ hashFiles('src/.gclient', 'src/DEPS') }}
+          restore-keys: |
+            ${{ runner.os }}-webrtc-output-${{ inputs.webrtc_branch }}-
+            ${{ runner.os }}-webrtc-output-
+
+      - name: Ensure gclient is available
         run: |
-          echo "This step is required to bypass `git credential-luci login`"
-          git config --global credential.helper store
-          echo "https://${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
+          if ! command -v gclient &> /dev/null; then
+            current_dir=$(pwd)
+            mkdir -p "$HOME/webrtc"
+            cd "$HOME/webrtc"
+            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+            export PATH="$PATH:$HOME/webrtc/depot_tools"
+            cd "$current_dir"
+          fi
+          if [ -d "$HOME/webrtc/depot_tools" ]; then
+            echo "$HOME/webrtc/depot_tools" >> "$GITHUB_PATH"
+          fi
 
       - name: "Build"
         env:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
-        run: bundle exec fastlane build webrtc_branch:${{ inputs.webrtc_branch }} --verbose
+        run: cd fastlane && bundle install && bundle exec fastlane ios build root:../src verbose:true maccatalyst_support:true
         timeout-minutes: 120
 
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: StreamWebRTC.xcframework.zip
-          path: fastlane/StreamWebRTC.xcframework.zip
+          path: .products/StreamWebRTC.xcframework.zip
           retention-days: 7
 
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: WebRTC.xcframework.zip
-          path: fastlane/WebRTC.xcframework.zip
+          path: .products/WebRTC.xcframework.zip
           retention-days: 7
