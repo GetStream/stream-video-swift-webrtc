@@ -117,7 +117,7 @@ private_lane :clone_and_modify_xcframework do |options|
   sh("cp -R #{old_framework_path} #{new_framework_path}")
 
   # Rename all files with the old framework name with the new one
-  ["#{sdk_name}.framework", "#{sdk_name}.h", sdk_name].each do |file_name|
+  ["#{sdk_name}.framework", "#{sdk_name}.dSYM", "#{sdk_name}.h", sdk_name].each do |file_name|
     Dir.glob("#{new_framework_path}/**/*").each do |old_file_path|
       next unless File.basename(old_file_path) == file_name
 
