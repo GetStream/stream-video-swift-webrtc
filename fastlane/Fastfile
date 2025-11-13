@@ -186,16 +186,17 @@ end
 
 private_lane :inject_objc_runtime_name do
   prefix = 'StreamRTC'
+  injected_classes = []
   Dir.glob('src/**/*.{h,m,mm}') do |file|
-    next if !File.file?(file) || file.match?(%r{/(?:unittests|test|build)/|\.git})
+    next if !File.file?(file) || !file.include?('/sdk/objc/') || file.match?(%r{/(?:unittests|test|build)/|\.git})
 
     content = File.read(file, mode: 'rb').encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
     original = content.dup
 
     interface_regex = /
-      ^(\s*(?:RTC_OBJC_EXPORT(?:_CLASS)?\s+)?)
+      ^(\s*(?:RTC_OBJC_EXPORT(?:_CLASS)?\s*\n\s*)?)
       @interface\s+
-      (RTC[A-Za-z0-9_]+)\s*(?::|$)
+      (RTC[A-Za-z0-9_]+)\b
     /x
 
     new_content = content.gsub(interface_regex) do |match|
@@ -206,13 +207,15 @@ private_lane :inject_objc_runtime_name do
       pre_context = content[0...Regexp.last_match.begin(0)].split("\n").last(3).join("\n")
       next match if pre_context.include?('objc_runtime_name')
 
+      injected_classes << classname
       attr_line = "#{indent}__attribute__((objc_runtime_name(\"#{prefix}#{classname[3..]}\")))\n"
       "#{attr_line}#{prefix_part}@interface #{classname}"
     end
 
     next if new_content == original
 
-    UI.message("🔧 #{file}")
+    UI.header("🔧 Injecting runtime names in #{file}")
+    injected_classes.each { |cls| UI.message("#{cls} → #{prefix}#{cls[3..]}") }
     File.write(file, new_content)
   end
 end
