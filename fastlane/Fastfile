@@ -190,34 +190,22 @@ private_lane :inject_objc_runtime_name do
   Dir.glob('src/**/*.{h,m,mm}') do |file|
     next if !File.file?(file) || !file.include?('/sdk/objc/') || file.match?(%r{/(?:unittests|test|build)/|\.git})
 
-    content = File.read(file, mode: 'rb').encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
-    original = content.dup
-
-    interface_regex = /
-      ^(\s*(?:RTC_OBJC_EXPORT(?:_CLASS)?\s*\n\s*)?)  # optional export macro
-      @interface\s+                                  # must be an interface
-      (RTC[A-Z][A-Za-z0-9_]+)                        # class name, must start with RTC + capital letter
-      (?:\s*:\s*[A-Za-z0-9_]+)?                      # optional superclass
-      \s*$                                           # end of line (avoid categories)
-    /x
-
-    new_content = content.gsub(interface_regex) do |match|
-      prefix_part = Regexp.last_match(1)
+    old_content = File.read(file, mode: 'rb').encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
+    new_content = old_content.gsub(/^(\s*)@interface\s+RTC_OBJC_TYPE\s*\(\s*(RTC[A-Za-z0-9_]+)\s*\)/) do
+      indent = Regexp.last_match(1)
       classname = Regexp.last_match(2)
-      indent = prefix_part[/^\s*/]
 
-      pre_context = content[0...Regexp.last_match.begin(0)].split("\n").last(3).join("\n")
-      next match if pre_context.include?('objc_runtime_name')
+      # Skip if already annotated
+      next Regexp.last_match(0) if old_content.include?("objc_runtime_name(\"#{prefix}#{classname[3..]}\"")
 
       injected_classes << classname
-      attr_line = "#{indent}__attribute__((objc_runtime_name(\"#{prefix}#{classname[3..]}\")))\n"
-      "#{attr_line}#{prefix_part}@interface #{classname}"
+      "#{indent}__attribute__((objc_runtime_name(\"#{prefix}#{classname[3..]}\")))\n#{indent}@interface RTC_OBJC_TYPE(#{classname})"
     end
 
-    next if new_content == original
+    next if injected_classes.empty?
 
     UI.header("🔧 Injecting runtime names in #{file}")
-    injected_classes.each { |cls| UI.message("#{cls} → #{prefix}#{cls[3..]}") }
+    injected_classes.uniq.each { |cls| UI.message("#{cls} → #{prefix}#{cls[3..]}") }
     File.write(file, new_content)
   end
 end
