@@ -194,7 +194,10 @@ private_lane :inject_objc_runtime_name do
       "#{attr_line}#{match}"
     end
 
-    File.write(file, new_content) if new_content != original
+    if new_content != original
+      UI.message("👉 #{file}")
+      File.write(file, new_content)
+    end
   end
 end
 
