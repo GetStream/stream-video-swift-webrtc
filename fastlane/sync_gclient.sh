@@ -5,7 +5,6 @@ if ! command -v gclient &> /dev/null; then
   mkdir $HOME/webrtc
   cd $HOME/webrtc
   git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
-  export PATH=$PATH:$HOME/webrtc/depot_tools
   cd $current_dir
 fi
 

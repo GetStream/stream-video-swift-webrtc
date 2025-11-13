@@ -102,9 +102,20 @@ lane :release do |options|
 end
 
 private_lane :build_xcframework do |options|
-  sh("./scripts/sync_gclient.sh #{options[:branch]}")
+  ENV['PATH'] = "#{ENV.fetch('PATH', nil)}:#{Dir.home}/webrtc/depot_tools"
+  sh("./sync_gclient.sh #{options[:branch]}")
   inject_objc_runtime_name
-  sh("./scripts/build_xcframework.sh")
+
+  Dir.chdir('src') do
+    sh("./tools_webrtc/ios/build_ios_libs.py \
+        --deployment-target 13.0 \
+        --extra-gn-args \
+          is_debug=false \
+          use_goma=false \
+          use_rtti=true \
+          rtc_libvpx_build_vp9=true")
+  end
+
   current_path = File.expand_path('src/out_ios_libs/WebRTC.xcframework')
   new_path = "./#{File.basename(current_path)}"
   FileUtils.mv(current_path, new_path)
@@ -176,8 +187,7 @@ end
 private_lane :inject_objc_runtime_name do
   prefix = 'StreamRTC'
   Dir.glob('src/**/*.{h,m,mm}') do |file|
-    next unless File.file?(file)
-    next if file.include?('/build/') || file.include?('.git')
+    next if !File.file?(file) || file.include?('/build/') || file.include?('.git')
 
     content = File.read(file, mode: 'rb').encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
     original = content.dup
@@ -190,14 +200,13 @@ private_lane :inject_objc_runtime_name do
       pre_context = content[0...Regexp.last_match.begin(0)].split("\n").last(3).join("\n")
       next match if pre_context.include?('objc_runtime_name')
 
-      attr_line = "#{indent}__attribute__((objc_runtime_name(\"#{prefix}#{classname[3..]}\")))\n"
-      "#{attr_line}#{match}"
+      "#{indent}__attribute__((objc_runtime_name(\"#{prefix}#{classname[3..]}\")))\n#{match}"
     end
 
-    if new_content != original
-      UI.message("👉 #{file}")
-      File.write(file, new_content)
-    end
+    next if new_content == original
+
+    UI.message("🔧 #{file}")
+    File.write(file, new_content)
   end
 end
 
