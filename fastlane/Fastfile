@@ -102,17 +102,9 @@ lane :release do |options|
 end
 
 private_lane :build_xcframework do |options|
-  sh("./sync_gclient.sh #{options[:branch]}")
-  Dir.chdir('src') do
-    sh('./tools_webrtc/ios/build_ios_libs.py \
-        --deployment-target 13.0 \
-        --extra-gn-args \
-          is_debug=false \
-          use_goma=false \
-          use_rtti=true \
-          rtc_libvpx_build_vp9=true')
-  end
+  sh("./scripts/sync_gclient.sh #{options[:branch]}")
   inject_objc_runtime_name
+  sh("./scripts/build_xcframework.sh")
   current_path = File.expand_path('src/out_ios_libs/WebRTC.xcframework')
   new_path = "./#{File.basename(current_path)}"
   FileUtils.mv(current_path, new_path)
