@@ -191,15 +191,16 @@ private_lane :inject_objc_runtime_name do
     next if !File.file?(file) || !file.include?('/sdk/objc/') || file.match?(%r{/(?:unittests|test|build)/|\.git})
 
     old_content = File.read(file, mode: 'rb').encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
-    new_content = old_content.gsub(/^(\s*)@interface\s+RTC_OBJC_TYPE\s*\(\s*(RTC[A-Za-z0-9_]+)\s*\)\s*:\s*([A-Za-z0-9_]+)/) do
+    new_content = old_content.gsub(/^(\s*)@interface\s+RTC_OBJC_TYPE\s*\(\s*(RTC[A-Za-z0-9_]+)\s*\)(.*)$/) do
       indent = Regexp.last_match(1)
       classname = Regexp.last_match(2)
+      rest = Regexp.last_match(3)
 
       # Skip if already annotated
       next Regexp.last_match(0) if old_content.include?("objc_runtime_name(\"#{prefix}#{classname[3..]}\"")
 
       injected_classes << classname
-      "#{indent}__attribute__((objc_runtime_name(\"#{prefix}#{classname[3..]}\")))\n#{indent}@interface RTC_OBJC_TYPE(#{classname})"
+      "#{indent}__attribute__((objc_runtime_name(\"#{prefix}#{classname[3..]}\")))\n#{indent}@interface RTC_OBJC_TYPE(#{classname})#{rest}"
     end
 
     next if injected_classes.empty?
