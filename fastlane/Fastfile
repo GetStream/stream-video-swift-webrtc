@@ -187,20 +187,27 @@ end
 private_lane :inject_objc_runtime_name do
   prefix = 'StreamRTC'
   Dir.glob('src/**/*.{h,m,mm}') do |file|
-    next if !File.file?(file) || file.include?('/build/') || file.include?('.git')
+    next if !File.file?(file) || file.match?(%r{/(?:unittests|test|build)/|\.git})
 
     content = File.read(file, mode: 'rb').encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
     original = content.dup
 
-    new_content = content.gsub(/^(\s*)@interface\s+(RTC[A-Za-z0-9_]+)\s*(?::|$)/) do |match|
-      indent = Regexp.last_match(1)
-      classname = Regexp.last_match(2)
+    interface_regex = /
+      ^(\s*(?:RTC_OBJC_EXPORT(?:_CLASS)?\s+)?)
+      @interface\s+
+      (RTC[A-Za-z0-9_]+)\s*(?::|$)
+    /x
 
-      # skip if already injected
+    new_content = content.gsub(interface_regex) do |match|
+      prefix_part = Regexp.last_match(1)
+      classname = Regexp.last_match(2)
+      indent = prefix_part[/^\s*/]
+
       pre_context = content[0...Regexp.last_match.begin(0)].split("\n").last(3).join("\n")
       next match if pre_context.include?('objc_runtime_name')
 
-      "#{indent}__attribute__((objc_runtime_name(\"#{prefix}#{classname[3..]}\")))\n#{match}"
+      attr_line = "#{indent}__attribute__((objc_runtime_name(\"#{prefix}#{classname[3..]}\")))\n"
+      "#{attr_line}#{prefix_part}@interface #{classname}"
     end
 
     next if new_content == original
