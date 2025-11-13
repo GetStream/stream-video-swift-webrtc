@@ -176,6 +176,7 @@ end
 private_lane :inject_objc_runtime_name do
   prefix = 'StreamRTC'
   Dir.glob('src/**/*.{h,m,mm}') do |file|
+    next unless File.file?(file)
     next if file.include?('/build/') || file.include?('.git')
 
     content = File.read(file, mode: 'rb').encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
