@@ -194,9 +194,11 @@ private_lane :inject_objc_runtime_name do
     original = content.dup
 
     interface_regex = /
-      ^(\s*(?:RTC_OBJC_EXPORT(?:_CLASS)?\s*\n\s*)?)
-      @interface\s+
-      (RTC[A-Za-z0-9_]+)\b
+      ^(\s*(?:RTC_OBJC_EXPORT(?:_CLASS)?\s*\n\s*)?)  # optional export macro
+      @interface\s+                                  # must be an interface
+      (RTC[A-Z][A-Za-z0-9_]+)                        # class name, must start with RTC + capital letter
+      (?:\s*:\s*[A-Za-z0-9_]+)?                      # optional superclass
+      \s*$                                           # end of line (avoid categories)
     /x
 
     new_content = content.gsub(interface_regex) do |match|
