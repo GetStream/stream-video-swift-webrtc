@@ -178,7 +178,7 @@ private_lane :inject_objc_runtime_name do
   Dir.glob('src/**/*.{h,m,mm}') do |file|
     next if file.include?('/build/') || file.include?('.git')
 
-    content = File.read(file)
+    content = File.read(file, mode: 'rb').encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
     original = content.dup
 
     new_content = content.gsub(/^(\s*)@interface\s+(RTC[A-Za-z0-9_]+)\s*(?::|$)/) do |match|
@@ -187,7 +187,7 @@ private_lane :inject_objc_runtime_name do
 
       # skip if already injected
       pre_context = content[0...Regexp.last_match.begin(0)].split("\n").last(3).join("\n")
-      next match if pre_context.include?("objc_runtime_name")
+      next match if pre_context.include?('objc_runtime_name')
 
       attr_line = "#{indent}__attribute__((objc_runtime_name(\"#{prefix}#{classname[3..]}\")))\n"
       "#{attr_line}#{match}"
