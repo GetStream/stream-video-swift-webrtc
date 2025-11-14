@@ -186,21 +186,24 @@ end
 
 private_lane :inject_objc_runtime_name do
   prefix = 'StreamRTC'
-  injected_classes = []
   Dir.glob('src/**/*.{h,m,mm}') do |file|
     next if !File.file?(file) || !file.include?('/sdk/objc/') || file.match?(%r{/(?:unittests|test|build)/|\.git})
 
+    injected_classes = []
     old_content = File.read(file, mode: 'rb').encode('UTF-8', invalid: :replace, undef: :replace, replace: '')
-    new_content = old_content.gsub(/^(\s*)@interface\s+RTC_OBJC_TYPE\s*\(\s*(RTC[A-Za-z0-9_]+)\s*\)\s*(.*)$/) do
+    new_content = old_content.gsub(/^(\s*)@interface\s+RTC_OBJC_TYPE\s*\(\s*(RTC[A-Za-z0-9_]+)\s*\)\s*([^;]*(?:\s*<[^>]*>)?\s*)$/) do
+      full_match = Regexp.last_match(0)
       indent = Regexp.last_match(1)
       classname = Regexp.last_match(2)
-      rest = Regexp.last_match(3)
 
       # Skip if already annotated
-      next Regexp.last_match(0) if old_content.include?("objc_runtime_name(\"#{prefix}#{classname[3..]}\"")
+      next full_match if old_content.include?("objc_runtime_name(\"#{prefix}#{classname[3..]}\"")
+
+      # Ensure this ends appropriately for an interface (not a forward declaration ending with ;)
+      next full_match if full_match.strip.end_with?(';')
 
       injected_classes << classname
-      "#{indent}__attribute__((objc_runtime_name(\"#{prefix}#{classname[3..]}\")))\n#{indent}@interface RTC_OBJC_TYPE(#{classname})#{rest}"
+      "#{indent}__attribute__((objc_runtime_name(\"#{prefix}#{classname[3..]}\")))\n#{full_match}"
     end
 
     next if injected_classes.empty?
