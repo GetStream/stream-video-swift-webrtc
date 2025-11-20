@@ -21,6 +21,11 @@ lane :code_review do
   sh('bundle exec rubocop Fastfile')
 end
 
+# Available options:
+# - webrtc_branch: The branch of WebRTC to build from (optional)
+#
+# Example usage:
+# bundle exec fastlane build webrtc_branch:"patch/m125"
 lane :build do |options|
   code_review
 
@@ -40,28 +45,16 @@ end
 
 # Available options:
 # - version: The version number for the release (required)
-# - webrtc_branch: The branch of WebRTC to build from (optional)
 #
 # Example usage:
-# bundle exec fastlane release version:125.6422.065 webrtc_branch:"patch/m125"
+# bundle exec fastlane release version:125.6422.065
 lane :release do |options|
   UI.user_error!("You must specify an xcframework version") unless options[:version]
   UI.user_error!("Tag for version #{options[:version]} already exists!") if git_tag_exists(tag: options[:version])
   UI.success("Ignore the red warning above. Tag for version #{options[:version]} is alright!")
 
-  code_review
-
-  ['*.zip', '*.xcframework'].each { |f| sh("rm -rf #{f}") }
-  xcframework_path = build_xcframework(branch: options[:webrtc_branch])
-  modified_xcframework_path = clone_and_modify_xcframework(file_path: xcframework_path)
-
-  match_me
-
-  [xcframework_path, modified_xcframework_path].each { |path| sign_xcframework(file_path: path) }
-
-  zip_xcframework_path = zip_xcframework(file_path: xcframework_path)
-  zip_modified_xcframework_path = zip_xcframework(file_path: modified_xcframework_path)
-
+  zip_xcframework_path = File.expand_path('WebRTC.xcframework.zip')
+  zip_modified_xcframework_path = File.expand_path('StreamWebRTC.xcframework.zip')
   sh("swift package compute-checksum #{zip_xcframework_path}").strip
   checksum = sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
 

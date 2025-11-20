@@ -17,8 +17,8 @@ on:
         default: false
 
 jobs:
-  release:
-    name: Publish new release
+  build:
+    name: Build
     runs-on: macos-15
     steps:
       - name: Connect Bot
@@ -27,8 +27,6 @@ jobs:
           ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
 
       - uses: actions/checkout@v4.1.1
-        with:
-          fetch-depth: 0
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -47,14 +45,86 @@ jobs:
           git config --global credential.helper store
           echo "https://${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
 
+      - name: "Fastlane - Build"
+        env:
+          GITHUB_TOKEN: ${{ secrets.CI_BOT_GITHUB_TOKEN }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
+        run: bundle exec fastlane build webrtc_branch:${{ inputs.webrtc_branch }} --verbose
+        timeout-minutes: 120
+
+      - uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: ${{ job.status }}
+          text: "❌ StreamVideoWebRTC release failed! 🚢\n\ncc: <!subteam^S05RBQ69U1H>"
+          fields: repo
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: StreamWebRTC.xcframework.zip
+          path: fastlane/StreamWebRTC.xcframework.zip
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: WebRTC.xcframework.zip
+          path: fastlane/WebRTC.xcframework.zip
+          retention-days: 7
+
+  release:
+    name: Publish new release
+    runs-on: macos-15
+    needs: build
+    steps:
+      - name: Connect Bot
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 0
+
+      - name: Download WebRTC
+        uses: actions/download-artifact@v4
+        with:
+          name: WebRTC.xcframework.zip
+          path: fastlane/WebRTC.xcframework.zip
+
+      - name: Download StreamWebRTC
+        uses: actions/download-artifact@v4
+        with:
+          name: StreamWebRTC.xcframework.zip
+          path: fastlane/StreamWebRTC.xcframework.zip
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.1
+          bundler-cache: true
+
       - name: "Fastlane - Publish Release"
         env:
           GITHUB_TOKEN: ${{ secrets.CI_BOT_GITHUB_TOKEN }}
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
-        run: bundle exec fastlane release version:${{ inputs.version }} webrtc_branch:${{ inputs.webrtc_branch }} skip_pods:${{ inputs.skip_pods }} --verbose
-        timeout-minutes: 120
+        run: bundle exec fastlane release version:${{ inputs.version }} skip_pods:${{ inputs.skip_pods }} --verbose
+        timeout-minutes: 20
+
+      - uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: ${{ job.status }}
+          text: "❌ StreamVideoWebRTC release failed! 🚢\n\ncc: <!subteam^S05RBQ69U1H>"
+          fields: repo
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - uses: 8398a7/action-slack@v3
         with:
