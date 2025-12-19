@@ -53,6 +53,7 @@ lane :release do |options|
   UI.user_error!("Tag for version #{options[:version]} already exists!") if git_tag_exists(tag: options[:version])
   UI.success("Ignore the red warning above. Tag for version #{options[:version]} is alright!")
 
+  check_unsafe_flags
   zip_xcframework_path = File.expand_path('WebRTC.xcframework.zip')
   zip_modified_xcframework_path = File.expand_path('StreamWebRTC.xcframework.zip')
   sh("swift package compute-checksum #{zip_xcframework_path}").strip
