@@ -86,6 +86,7 @@ lane :release do |options|
 
   publish_ios_sdk(
     skip_pods: options[:skip_pods],
+    skip_branch_check: true,
     skip_git_status_check: false,
     github_repo: github_repo,
     sdk_names: [modified_sdk_name],
