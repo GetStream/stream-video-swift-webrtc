@@ -85,7 +85,7 @@ lane :release do |options|
   sh('git push')
 
   publish_ios_sdk(
-    skip_pods: options[:skip_pods],
+    skip_pods: [true, 'true'].include?(options[:skip_pods]),
     skip_branch_check: true,
     skip_git_status_check: false,
     github_repo: github_repo,
