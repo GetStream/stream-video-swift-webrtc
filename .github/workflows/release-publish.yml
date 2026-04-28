@@ -25,7 +25,7 @@ jobs:
   build:
     name: Build
     if: ${{ !inputs.skip_spm }}
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - name: Connect Bot
         uses: webfactory/ssh-agent@v0.7.0
@@ -84,7 +84,7 @@ jobs:
 
   release:
     name: Publish new release
-    runs-on: macos-15
+    runs-on: macos-26
     needs: build
     if: ${{ !cancelled() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
     steps:
