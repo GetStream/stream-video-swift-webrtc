@@ -24,6 +24,7 @@ on:
 jobs:
   build:
     name: Build
+    if: ${{ !inputs.skip_spm }}
     runs-on: macos-15
     steps:
       - name: Connect Bot
@@ -85,6 +86,7 @@ jobs:
     name: Publish new release
     runs-on: macos-15
     needs: build
+    if: ${{ !cancelled() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
     steps:
       - name: Connect Bot
         uses: webfactory/ssh-agent@v0.7.0
@@ -96,12 +98,14 @@ jobs:
           fetch-depth: 0
 
       - name: Download WebRTC
+        if: ${{ !inputs.skip_spm }}
         uses: actions/download-artifact@v4
         with:
           name: WebRTC.xcframework.zip
           path: fastlane/
 
       - name: Download StreamWebRTC
+        if: ${{ !inputs.skip_spm }}
         uses: actions/download-artifact@v4
         with:
           name: StreamWebRTC.xcframework.zip
