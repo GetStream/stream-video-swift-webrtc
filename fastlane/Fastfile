@@ -49,44 +49,51 @@ end
 # Example usage:
 # bundle exec fastlane release version:125.6422.065
 lane :release do |options|
-  UI.user_error!("You must specify an xcframework version") unless options[:version]
-  UI.user_error!("Tag for version #{options[:version]} already exists!") if git_tag_exists(tag: options[:version])
-  UI.success("Ignore the red warning above. Tag for version #{options[:version]} is alright!")
+  skip_pods = [true, 'true'].include?(options[:skip_pods])
+  skip_spm = [true, 'true'].include?(options[:skip_spm])
+  upload_assets = []
 
-  check_unsafe_flags
-  zip_xcframework_path = File.expand_path('WebRTC.xcframework.zip')
-  zip_modified_xcframework_path = File.expand_path('StreamWebRTC.xcframework.zip')
-  sh("swift package compute-checksum #{zip_xcframework_path}").strip
-  checksum = sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
+  unless skip_spm
+    UI.user_error!("You must specify an xcframework version") unless options[:version]
+    UI.user_error!("Tag for version #{options[:version]} already exists!") if git_tag_exists(tag: options[:version])
+    UI.success("Ignore the red warning above. Tag for version #{options[:version]} is alright!")
 
-  version_bump_podspec(path: podspec_path, version_number: options[:version])
+    check_unsafe_flags
+    zip_xcframework_path = File.expand_path('WebRTC.xcframework.zip')
+    zip_modified_xcframework_path = File.expand_path('StreamWebRTC.xcframework.zip')
+    upload_assets = [zip_xcframework_path, zip_modified_xcframework_path]
+    sh("swift package compute-checksum #{zip_xcframework_path}").strip
+    checksum = sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
 
-  file_data = ''
-  File.readlines(swift_package_path).each do |line|
-    checksum_pattern = /(checksum: ")[a-z0-9]+(")/
-    url_pattern = %r{(releases/download/)[.0-9]+(/)}
+    version_bump_podspec(path: podspec_path, version_number: options[:version])
 
-    formatted_line =
-      if line.match(checksum_pattern)
-        line.gsub(checksum_pattern, "\\1#{checksum}\\2")
-      elsif line.match(url_pattern)
-        line.gsub(url_pattern, "\\1#{options[:version]}\\2")
-      else
-        line
-      end
+    file_data = ''
+    File.readlines(swift_package_path).each do |line|
+      checksum_pattern = /(checksum: ")[a-z0-9]+(")/
+      url_pattern = %r{(releases/download/)[.0-9]+(/)}
 
-    file_data << formatted_line
+      formatted_line =
+        if line.match(checksum_pattern)
+          line.gsub(checksum_pattern, "\\1#{checksum}\\2")
+        elsif line.match(url_pattern)
+          line.gsub(url_pattern, "\\1#{options[:version]}\\2")
+        else
+          line
+        end
+
+      file_data << formatted_line
+    end
+
+    File.open(swift_package_path, 'w') { |file| file << file_data }
+
+    sh('git add -A')
+    sh("git commit -m 'Bump #{options[:version]}'")
+    sh('git push')
   end
 
-  File.open(swift_package_path, 'w') { |file| file << file_data }
-
-  sh('git add -A')
-  sh("git commit -m 'Bump #{options[:version]}'")
-  sh('git push')
-
   publish_ios_sdk(
-    skip_pods: [true, 'true'].include?(options[:skip_pods]),
-    skip_spm: [true, 'true'].include?(options[:skip_spm]),
+    skip_pods: skip_pods,
+    skip_spm: skip_spm,
     skip_branch_check: true,
     skip_git_status_check: false,
     github_repo: github_repo,
@@ -94,7 +101,7 @@ lane :release do |options|
     podspec_names: [modified_sdk_name],
     version: options[:version],
     changelog: "Upgrade to WebRTC v#{options[:version]}\n\nChecksum: #{checksum}",
-    upload_assets: [zip_xcframework_path, zip_modified_xcframework_path]
+    upload_assets: upload_assets
   )
 end
 
