@@ -15,6 +15,11 @@ on:
         required: true
         type: boolean
         default: false
+      skip_spm:
+        description: "Skip the SPM update"
+        required: true
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -114,7 +119,7 @@ jobs:
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
-        run: bundle exec fastlane release version:${{ inputs.version }} skip_pods:${{ inputs.skip_pods }} --verbose
+        run: bundle exec fastlane release version:${{ inputs.version }} skip_pods:${{ inputs.skip_pods }} skip_spm:${{ inputs.skip_spm }} --verbose
         timeout-minutes: 20
 
       - uses: 8398a7/action-slack@v3
