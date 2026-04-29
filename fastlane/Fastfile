@@ -90,6 +90,7 @@ lane :release do |options|
     skip_git_status_check: false,
     github_repo: github_repo,
     sdk_names: [modified_sdk_name],
+    podspec_names: [modified_sdk_name],
     version: options[:version],
     changelog: "Upgrade to WebRTC v#{options[:version]}\n\nChecksum: #{checksum}",
     upload_assets: [zip_xcframework_path, zip_modified_xcframework_path]
