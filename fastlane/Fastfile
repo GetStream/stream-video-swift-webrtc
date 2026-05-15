@@ -3,6 +3,8 @@ skip_docs
 
 require 'json'
 require 'net/http'
+require 'shellwords'
+require 'uri'
 
 github_repo = ENV['GITHUB_REPOSITORY'] || 'GetStream/stream-video-swift-webrtc'
 sdk_name = 'WebRTC'
@@ -44,14 +46,53 @@ lane :build do |options|
 end
 
 # Available options:
-# - version: The version number for the release (required)
+# - webrtc_xcframework_url: The URL to download WebRTC.xcframework.zip from (required)
 #
 # Example usage:
-# bundle exec fastlane release version:125.6422.065
+# bundle exec fastlane prepare_release_from_url webrtc_xcframework_url:"https://example.com/WebRTC.xcframework.zip"
+lane :prepare_release_from_url do |options|
+  UI.user_error!('You must specify a WebRTC.xcframework.zip URL') unless options[:webrtc_xcframework_url]
+
+  code_review
+
+  ['*.zip', '*.xcframework'].each { |f| sh("rm -rf #{f}") }
+  xcframework_path = download_and_extract_xcframework(url: options[:webrtc_xcframework_url])
+  modified_xcframework_path = clone_and_modify_xcframework(file_path: xcframework_path)
+
+  match_me
+
+  [xcframework_path, modified_xcframework_path].each { |path| sign_xcframework(file_path: path) }
+
+  zip_xcframework_path = zip_xcframework(file_path: xcframework_path)
+  zip_modified_xcframework_path = zip_xcframework(file_path: modified_xcframework_path)
+  sh("swift package compute-checksum #{zip_xcframework_path}").strip
+  sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
+end
+
+# Available options:
+# - version: The version number for the release (required)
+# - pre_release: Mark the Github release as a pre-release (optional)
+# - webrtc_release_url: The upstream WebRTC release URL this release was created from (optional)
+#
+# Example usage:
+# bundle exec fastlane release version:125.6422.065 pre_release:false
 lane :release do |options|
+  UI.user_error!("You must specify an xcframework version") unless options[:version]
+  UI.user_error!("Tag for version #{options[:version]} already exists!") if git_tag_exists(tag: options[:version])
+  UI.success("Ignore the red warning above. Tag for version #{options[:version]} is alright!")
+  pre_release = [true, 'true'].include?(options[:pre_release])
   skip_pods = [true, 'true'].include?(options[:skip_pods])
   skip_spm = [true, 'true'].include?(options[:skip_spm])
-  upload_assets = []
+  release_options = {
+    skip_pods: pre_release || skip_pods,
+    skip_spm: skip_spm,
+    skip_branch_check: true,
+    skip_git_status_check: false,
+    github_repo: github_repo,
+    sdk_names: [modified_sdk_name],
+    podspec_names: [modified_sdk_name],
+    version: options[:version]
+  }
 
   unless skip_spm
     UI.user_error!("You must specify an xcframework version") unless options[:version]
@@ -61,7 +102,6 @@ lane :release do |options|
     check_unsafe_flags
     zip_xcframework_path = File.expand_path('WebRTC.xcframework.zip')
     zip_modified_xcframework_path = File.expand_path('StreamWebRTC.xcframework.zip')
-    upload_assets = [zip_xcframework_path, zip_modified_xcframework_path]
     sh("swift package compute-checksum #{zip_xcframework_path}").strip
     checksum = sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
 
@@ -89,20 +129,18 @@ lane :release do |options|
     sh('git add -A')
     sh("git commit -m 'Bump #{options[:version]}'")
     sh('git push')
+
+    changelog = "Upgrade to WebRTC v#{options[:version]}\n\nChecksum: #{checksum}"
+    webrtc_release_url = options[:webrtc_release_url].to_s.strip
+    changelog += "\n\nCreated from: #{webrtc_release_url}" unless webrtc_release_url.empty?
+
+    release_options[:changelog] = changelog
+    release_options[:upload_assets] = [zip_xcframework_path, zip_modified_xcframework_path]
   end
 
-  publish_ios_sdk(
-    skip_pods: skip_pods,
-    skip_spm: skip_spm,
-    skip_branch_check: true,
-    skip_git_status_check: false,
-    github_repo: github_repo,
-    sdk_names: [modified_sdk_name],
-    podspec_names: [modified_sdk_name],
-    version: options[:version],
-    changelog: "Upgrade to WebRTC v#{options[:version]}\n\nChecksum: #{checksum}",
-    upload_assets: upload_assets
-  )
+  publish_ios_sdk(release_options)
+
+  mark_github_release_as_prerelease(github_repo: github_repo, tag: options[:version]) if pre_release && !skip_spm
 end
 
 private_lane :build_xcframework do |options|
@@ -111,6 +149,34 @@ private_lane :build_xcframework do |options|
   new_path = "./#{File.basename(current_path)}"
   FileUtils.mv(current_path, new_path)
   File.expand_path(new_path)
+end
+
+private_lane :download_and_extract_xcframework do |options|
+  url = options[:url]
+  uri = URI.parse(url)
+  unless uri.scheme == 'https' && uri.host == 'github.com' && uri.path.start_with?('/GetStream/webrtc/')
+    UI.user_error!('WebRTC.xcframework.zip URL must be under https://github.com/GetStream/webrtc/')
+  end
+
+  work_dir = File.expand_path('downloaded_web_rtc')
+  zip_path = File.join(work_dir, "#{sdk_name}.xcframework.zip")
+  target_path = File.expand_path("#{sdk_name}.xcframework")
+
+  FileUtils.rm_rf(work_dir)
+  FileUtils.mkdir_p(work_dir)
+
+  sh("curl --fail --location --output #{Shellwords.escape(zip_path)} #{Shellwords.escape(url)}")
+  sh("ditto -x -k #{Shellwords.escape(zip_path)} #{Shellwords.escape(work_dir)}")
+
+  xcframeworks = Dir.glob("#{work_dir}/**/#{sdk_name}.xcframework").select { |path| File.directory?(path) }
+  if xcframeworks.size != 1
+    UI.user_error!("Expected one #{sdk_name}.xcframework in the downloaded zip, found #{xcframeworks.size}")
+  end
+
+  FileUtils.rm_rf(target_path)
+  FileUtils.mv(xcframeworks.first, target_path)
+  FileUtils.rm_rf(work_dir)
+  target_path
 end
 
 private_lane :clone_and_modify_xcframework do |options|
@@ -172,6 +238,41 @@ private_lane :zip_xcframework do |options|
   zip_path = "#{options[:file_path]}.zip"
   sh("ditto -c -k --sequesterRsrc --keepParent #{options[:file_path]} #{zip_path}")
   zip_path
+end
+
+private_lane :mark_github_release_as_prerelease do |options|
+  github_token = ENV.fetch('GITHUB_TOKEN', nil)
+  UI.user_error!('GITHUB_TOKEN is required to mark the release as a pre-release') unless github_token
+
+  encoded_tag = URI.encode_www_form_component(options[:tag])
+  get_release_url = URI("https://api.github.com/repos/#{options[:github_repo]}/releases/tags/#{encoded_tag}")
+  get_release_request = Net::HTTP::Get.new(get_release_url)
+  get_release_request['Accept'] = 'application/vnd.github+json'
+  get_release_request['Authorization'] = "Bearer #{github_token}"
+
+  get_release_response = Net::HTTP.start(get_release_url.hostname, get_release_url.port, use_ssl: true) do |http|
+    http.request(get_release_request)
+  end
+
+  unless get_release_response.kind_of?(Net::HTTPSuccess)
+    UI.user_error!("Failed to fetch Github release #{options[:tag]}: #{get_release_response.body}")
+  end
+
+  release_id = JSON.parse(get_release_response.body).fetch('id')
+  update_release_url = URI("https://api.github.com/repos/#{options[:github_repo]}/releases/#{release_id}")
+  update_release_request = Net::HTTP::Patch.new(update_release_url)
+  update_release_request['Accept'] = 'application/vnd.github+json'
+  update_release_request['Authorization'] = "Bearer #{github_token}"
+  update_release_request['Content-Type'] = 'application/json'
+  update_release_request.body = JSON.dump(prerelease: true)
+
+  update_release_response = Net::HTTP.start(update_release_url.hostname, update_release_url.port, use_ssl: true) do |http|
+    http.request(update_release_request)
+  end
+
+  unless update_release_response.kind_of?(Net::HTTPSuccess)
+    UI.user_error!("Failed to mark Github release #{options[:tag]} as a pre-release: #{update_release_response.body}")
+  end
 end
 
 private_lane :appstore_api_key do
