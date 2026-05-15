@@ -1,0 +1,78 @@
+name: "Publish Pods Version"
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_url:
+        description: "The StreamVideoWebRTC GitHub release URL"
+        required: true
+
+jobs:
+  release:
+    name: Publish Pods Version
+    runs-on: macos-26
+    steps:
+      - name: Connect Bot
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
+
+      - name: Resolve release version
+        id: resolve_release
+        env:
+          RELEASE_URL: ${{ inputs.release_url }}
+        run: |
+          ruby <<'RUBY'
+          require 'uri'
+
+          uri = URI.parse(ENV.fetch('RELEASE_URL'))
+          release_path = '/GetStream/stream-video-swift-webrtc/releases/tag/'
+          unless uri.scheme == 'https' && uri.host == 'github.com' && uri.path.start_with?(release_path)
+            abort('Release URL must be under https://github.com/GetStream/stream-video-swift-webrtc/releases/tag/')
+          end
+
+          version = uri.path.delete_prefix(release_path).chomp('/')
+          abort('Release URL must include a version tag') if version.empty? || version.include?('/')
+
+          File.open(ENV.fetch('GITHUB_OUTPUT'), 'a') do |file|
+            file.puts("version=#{version}")
+          end
+          RUBY
+
+      - uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 0
+          # Publish the podspec from the exact release tag, not the current workflow branch.
+          ref: ${{ steps.resolve_release.outputs.version }}
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.2
+          bundler-cache: true
+
+      - name: "Fastlane - Publish Pods"
+        env:
+          GITHUB_TOKEN: ${{ secrets.CI_BOT_GITHUB_TOKEN }}
+          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
+        run: bundle exec fastlane release_cocoapods version:"${{ steps.resolve_release.outputs.version }}" --verbose
+        timeout-minutes: 20
+
+      - uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: ${{ job.status }}
+          text: "❌ StreamVideoWebRTC CocoaPods release failed! 🚢\n\ncc: <!subteam^S05RBQ69U1H>"
+          fields: repo
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: "🎉 The new CocoaPods release has been shipped! 🚢\n\ncc: <!subteam^S05RBQ69U1H>"
+          fields: repo
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
