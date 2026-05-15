@@ -1,10 +1,15 @@
-name: "Publish Pods Version"
+name: "Publish on Cocoapods"
+
+# Promotes an existing stream-video-swift-webrtc GitHub release to CocoaPods.
+# Use this after a pre-release has been validated through SPM. It extracts the version from the
+# release URL, checks out that exact tag, verifies the podspec version, and publishes only CocoaPods.
+# No xcframework build, signing, GitHub release creation, or Package.swift update happens here.
 
 on:
   workflow_dispatch:
     inputs:
       release_url:
-        description: "The StreamVideoWebRTC GitHub release URL"
+        description: "Existing stream-video-swift-webrtc release URL to publish to CocoaPods"
         required: true
 
 jobs:
@@ -64,7 +69,14 @@ jobs:
         if: failure()
         with:
           status: ${{ job.status }}
-          text: "❌ StreamVideoWebRTC CocoaPods release failed! 🚢\n\ncc: <!subteam^S05RBQ69U1H>"
+          text: |
+            ❌ StreamVideoWebRTC CocoaPods release failed! 🚢
+
+            Flow: Publish on Cocoapods
+            Version: ${{ steps.resolve_release.outputs.version }}
+            Release URL: ${{ inputs.release_url }}
+
+            cc: <!subteam^S05RBQ69U1H>
           fields: repo
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -72,7 +84,14 @@ jobs:
       - uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
-          text: "🎉 The new CocoaPods release has been shipped! 🚢\n\ncc: <!subteam^S05RBQ69U1H>"
+          text: |
+            🎉 StreamVideoWebRTC CocoaPods release has been shipped! 🚢
+
+            Flow: Publish on Cocoapods
+            Version: ${{ steps.resolve_release.outputs.version }}
+            Release URL: ${{ inputs.release_url }}
+
+            cc: <!subteam^S05RBQ69U1H>
           fields: repo
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
