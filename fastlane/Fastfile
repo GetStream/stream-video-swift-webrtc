@@ -78,8 +78,9 @@ end
 # bundle exec fastlane release version:125.6422.065 pre_release:false
 lane :release do |options|
   UI.user_error!("You must specify an xcframework version") unless options[:version]
-  UI.user_error!("Tag for version #{options[:version]} already exists!") if git_tag_exists(tag: options[:version])
-  UI.success("Ignore the red warning above. Tag for version #{options[:version]} is alright!")
+  version = sanitize_semver_version(version: options[:version])
+  UI.user_error!("Tag for version #{version} already exists!") if git_tag_exists(tag: version)
+  UI.success("Ignore the red warning above. Tag for version #{version} is alright!")
   pre_release = [true, 'true'].include?(options[:pre_release])
   skip_pods = [true, 'true'].include?(options[:skip_pods])
   skip_spm = [true, 'true'].include?(options[:skip_spm])
@@ -91,13 +92,13 @@ lane :release do |options|
     github_repo: github_repo,
     sdk_names: [modified_sdk_name],
     podspec_names: [modified_sdk_name],
-    version: options[:version]
+    version: version
   }
 
   unless skip_spm
-    UI.user_error!("You must specify an xcframework version") unless options[:version]
-    UI.user_error!("Tag for version #{options[:version]} already exists!") if git_tag_exists(tag: options[:version])
-    UI.success("Ignore the red warning above. Tag for version #{options[:version]} is alright!")
+    UI.user_error!("You must specify an xcframework version") unless version
+    UI.user_error!("Tag for version #{version} already exists!") if git_tag_exists(tag: version)
+    UI.success("Ignore the red warning above. Tag for version #{version} is alright!")
 
     check_unsafe_flags
     zip_xcframework_path = File.expand_path('WebRTC.xcframework.zip')
@@ -105,7 +106,7 @@ lane :release do |options|
     sh("swift package compute-checksum #{zip_xcframework_path}").strip
     checksum = sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
 
-    version_bump_podspec(path: podspec_path, version_number: options[:version])
+    version_bump_podspec(path: podspec_path, version_number: version)
 
     file_data = ''
     File.readlines(swift_package_path).each do |line|
@@ -116,7 +117,7 @@ lane :release do |options|
         if line.match(checksum_pattern)
           line.gsub(checksum_pattern, "\\1#{checksum}\\2")
         elsif line.match(url_pattern)
-          line.gsub(url_pattern, "\\1#{options[:version]}\\2")
+          line.gsub(url_pattern, "\\1#{version}\\2")
         else
           line
         end
@@ -127,10 +128,10 @@ lane :release do |options|
     File.open(swift_package_path, 'w') { |file| file << file_data }
 
     sh('git add -A')
-    sh("git commit -m 'Bump #{options[:version]}'")
+    sh("git commit -m 'Bump #{version}'")
     sh('git push')
 
-    changelog = "Upgrade to WebRTC v#{options[:version]}\n\nChecksum: #{checksum}"
+    changelog = "Upgrade to WebRTC v#{version}\n\nChecksum: #{checksum}"
     webrtc_release_url = options[:webrtc_release_url].to_s.strip
     changelog += "\n\nCreated from: #{webrtc_release_url}" unless webrtc_release_url.empty?
 
@@ -140,7 +141,7 @@ lane :release do |options|
 
   publish_ios_sdk(release_options)
 
-  mark_github_release_as_prerelease(github_repo: github_repo, tag: options[:version]) if pre_release && !skip_spm
+  mark_github_release_as_prerelease(github_repo: github_repo, tag: version) if pre_release && !skip_spm
 end
 
 private_lane :build_xcframework do |options|
@@ -149,6 +150,17 @@ private_lane :build_xcframework do |options|
   new_path = "./#{File.basename(current_path)}"
   FileUtils.mv(current_path, new_path)
   File.expand_path(new_path)
+end
+
+private_lane :sanitize_semver_version do |options|
+  version = options[:version].to_s.strip
+  parts = version.split('.')
+
+  if parts.empty? || parts.size > 3 || parts.any? { |part| part.empty? || !part.match?(/\A\d+\z/) }
+    UI.user_error!("Version #{version} must contain one to three numeric dot-separated components")
+  end
+
+  (parts + Array.new(3 - parts.size, '0')).join('.')
 end
 
 private_lane :download_and_extract_xcframework do |options|
