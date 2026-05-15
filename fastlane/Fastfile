@@ -74,74 +74,97 @@ end
 # - pre_release: Mark the Github release as a pre-release (optional)
 # - webrtc_release_url: The upstream WebRTC release URL this release was created from (optional)
 #
+# Bumps Package.swift and the podspec, commits the version change, and publishes the SPM/GitHub release.
+# Normal releases also publish CocoaPods; pre-releases stay SPM-only and can be promoted later with release_cocoapods.
+#
 # Example usage:
 # bundle exec fastlane release version:125.6422.065 pre_release:false
 lane :release do |options|
   UI.user_error!("You must specify an xcframework version") unless options[:version]
   version = sanitize_semver_version(version: options[:version])
+  pre_release = [true, 'true'].include?(options[:pre_release])
+
   UI.user_error!("Tag for version #{version} already exists!") if git_tag_exists(tag: version)
   UI.success("Ignore the red warning above. Tag for version #{version} is alright!")
+
+  check_unsafe_flags
+  zip_xcframework_path = File.expand_path('WebRTC.xcframework.zip')
+  zip_modified_xcframework_path = File.expand_path('StreamWebRTC.xcframework.zip')
+  sh("swift package compute-checksum #{zip_xcframework_path}").strip
+  checksum = sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
+
+  update_swift_package(version: version, checksum: checksum)
+  # CocoaPods is published later from the release tag, so keep the podspec version in the same bump commit.
+  version_bump_podspec(path: podspec_path, version_number: version)
+
+  sh('git add -A')
+  sh("git commit -m 'Bump #{version}'")
+  sh('git push')
+
+  changelog = "Upgrade to WebRTC v#{version}\n\nChecksum: #{checksum}"
+  webrtc_release_url = options[:webrtc_release_url].to_s.strip
+  changelog += "\n\nCreated from: #{webrtc_release_url}" unless webrtc_release_url.empty?
+
+  release_spm(
+    version: version,
+    changelog: changelog,
+    upload_assets: [zip_xcframework_path, zip_modified_xcframework_path],
+    pre_release: pre_release
+  )
+
+  release_cocoapods(version: version) unless pre_release
+end
+
+# Available options:
+# - version: The normalized release version to publish (required)
+# - changelog: The GitHub release changelog (required by this repo's release flow)
+# - upload_assets: The zipped xcframework assets to attach to the GitHub release (required)
+# - pre_release: Mark the GitHub release as a pre-release after creation (optional)
+#
+# Publishes only the GitHub/SPM release. It intentionally skips CocoaPods.
+lane :release_spm do |options|
+  UI.user_error!("You must specify an xcframework version") unless options[:version]
+  UI.user_error!('You must specify upload assets') unless options[:upload_assets]
+
+  publish_ios_sdk(
+    # SPM and CocoaPods are intentionally split. This lane only creates the GitHub release and SPM assets.
+    skip_pods: true,
+    skip_spm: false,
+    skip_branch_check: true,
+    skip_git_status_check: false,
+    github_repo: github_repo,
+    sdk_names: [modified_sdk_name],
+    podspec_names: [modified_sdk_name],
+    version: options[:version],
+    changelog: options[:changelog],
+    upload_assets: options[:upload_assets]
+  )
+
   pre_release = [true, 'true'].include?(options[:pre_release])
-  skip_pods = [true, 'true'].include?(options[:skip_pods])
-  skip_spm = [true, 'true'].include?(options[:skip_spm])
-  release_options = {
-    skip_pods: pre_release || skip_pods,
-    skip_spm: skip_spm,
+  mark_github_release_as_prerelease(github_repo: github_repo, tag: options[:version]) if pre_release
+end
+
+# Available options:
+# - version: The release version to publish to CocoaPods (required)
+#
+# Publishes only CocoaPods. The pods workflow must checkout the release tag first so the local podspec matches
+# the existing GitHub release assets.
+lane :release_cocoapods do |options|
+  UI.user_error!("You must specify an xcframework version") unless options[:version]
+  version = sanitize_semver_version(version: options[:version])
+  ensure_podspec_version(version: version)
+
+  publish_ios_sdk(
+    # The pods workflow checks out the release tag first, so this pushes that tag's podspec without rebuilding.
+    skip_pods: false,
+    skip_spm: true,
     skip_branch_check: true,
     skip_git_status_check: false,
     github_repo: github_repo,
     sdk_names: [modified_sdk_name],
     podspec_names: [modified_sdk_name],
     version: version
-  }
-
-  unless skip_spm
-    UI.user_error!("You must specify an xcframework version") unless version
-    UI.user_error!("Tag for version #{version} already exists!") if git_tag_exists(tag: version)
-    UI.success("Ignore the red warning above. Tag for version #{version} is alright!")
-
-    check_unsafe_flags
-    zip_xcframework_path = File.expand_path('WebRTC.xcframework.zip')
-    zip_modified_xcframework_path = File.expand_path('StreamWebRTC.xcframework.zip')
-    sh("swift package compute-checksum #{zip_xcframework_path}").strip
-    checksum = sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
-
-    version_bump_podspec(path: podspec_path, version_number: version)
-
-    file_data = ''
-    File.readlines(swift_package_path).each do |line|
-      checksum_pattern = /(checksum: ")[a-z0-9]+(")/
-      url_pattern = %r{(releases/download/)[.0-9]+(/)}
-
-      formatted_line =
-        if line.match(checksum_pattern)
-          line.gsub(checksum_pattern, "\\1#{checksum}\\2")
-        elsif line.match(url_pattern)
-          line.gsub(url_pattern, "\\1#{version}\\2")
-        else
-          line
-        end
-
-      file_data << formatted_line
-    end
-
-    File.open(swift_package_path, 'w') { |file| file << file_data }
-
-    sh('git add -A')
-    sh("git commit -m 'Bump #{version}'")
-    sh('git push')
-
-    changelog = "Upgrade to WebRTC v#{version}\n\nChecksum: #{checksum}"
-    webrtc_release_url = options[:webrtc_release_url].to_s.strip
-    changelog += "\n\nCreated from: #{webrtc_release_url}" unless webrtc_release_url.empty?
-
-    release_options[:changelog] = changelog
-    release_options[:upload_assets] = [zip_xcframework_path, zip_modified_xcframework_path]
-  end
-
-  publish_ios_sdk(release_options)
-
-  mark_github_release_as_prerelease(github_repo: github_repo, tag: version) if pre_release && !skip_spm
+  )
 end
 
 private_lane :build_xcframework do |options|
@@ -161,6 +184,34 @@ private_lane :sanitize_semver_version do |options|
   end
 
   (parts + Array.new(3 - parts.size, '0')).join('.')
+end
+
+private_lane :update_swift_package do |options|
+  file_data = ''
+  File.readlines(swift_package_path).each do |line|
+    checksum_pattern = /(checksum: ")[a-z0-9]+(")/
+    url_pattern = %r{(releases/download/)[.0-9]+(/)}
+
+    formatted_line =
+      if line.match(checksum_pattern)
+        line.gsub(checksum_pattern, "\\1#{options[:checksum]}\\2")
+      elsif line.match(url_pattern)
+        line.gsub(url_pattern, "\\1#{options[:version]}\\2")
+      else
+        line
+      end
+
+    file_data << formatted_line
+  end
+
+  File.open(swift_package_path, 'w') { |file| file << file_data }
+end
+
+private_lane :ensure_podspec_version do |options|
+  podspec_version = File.read(podspec_path).match(/spec.version\s*=\s*"([^"]+)"/)&.[](1)
+  return if podspec_version == options[:version]
+
+  UI.user_error!("Podspec version #{podspec_version} does not match release version #{options[:version]}")
 end
 
 private_lane :download_and_extract_xcframework do |options|

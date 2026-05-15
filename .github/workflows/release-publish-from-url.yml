@@ -124,7 +124,7 @@ jobs:
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
-        run: bundle exec fastlane release version:"${{ needs.prepare.outputs.tag }}" skip_pods:false pre_release:${{ inputs.pre_release }} webrtc_release_url:"${{ inputs.webrtc_release_url }}" --verbose
+        run: bundle exec fastlane release version:"${{ needs.prepare.outputs.tag }}" pre_release:${{ inputs.pre_release }} webrtc_release_url:"${{ inputs.webrtc_release_url }}" --verbose
         timeout-minutes: 20
 
       - uses: 8398a7/action-slack@v3

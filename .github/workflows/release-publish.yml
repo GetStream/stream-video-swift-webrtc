@@ -10,26 +10,15 @@ on:
         description: "The branch of WebRTC to build from"
         required: true
         default: "main"
-      skip_pods:
-        description: "Skip the pods update"
-        required: true
-        type: boolean
-        default: false
-      skip_spm:
-        description: "Skip the SPM update"
-        type: boolean
-        default: false
-        required: true
       pre_release:
         description: "Mark the GitHub release as a pre-release"
         required: false
         type: boolean
-        default: true
+        default: false
 
 jobs:
   build:
     name: Build
-    if: ${{ !inputs.skip_spm }}
     runs-on: macos-26
     steps:
       - name: Connect Bot
@@ -103,14 +92,12 @@ jobs:
           fetch-depth: 0
 
       - name: Download WebRTC
-        if: ${{ !inputs.skip_spm }}
         uses: actions/download-artifact@v4
         with:
           name: WebRTC.xcframework.zip
           path: fastlane/
 
       - name: Download StreamWebRTC
-        if: ${{ !inputs.skip_spm }}
         uses: actions/download-artifact@v4
         with:
           name: StreamWebRTC.xcframework.zip
@@ -128,7 +115,7 @@ jobs:
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
-        run: bundle exec fastlane release version:"${{ inputs.version }}" skip_pods:${{ inputs.skip_pods }} pre_release:${{ inputs.pre_release }} skip_spm:${{ inputs.skip_spm }} --verbose
+        run: bundle exec fastlane release version:"${{ inputs.version }}" pre_release:${{ inputs.pre_release }} --verbose
         timeout-minutes: 20
 
       - uses: 8398a7/action-slack@v3
