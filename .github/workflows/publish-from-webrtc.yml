@@ -1,0 +1,175 @@
+name: "Publish from WebRTC"
+
+# Repackages an existing upstream GetStream/webrtc GitHub release without rebuilding WebRTC.
+# The workflow extracts the upstream tag, downloads WebRTC.xcframework.zip from that release,
+# signs/zips WebRTC and StreamWebRTC, then creates the stream-video-swift-webrtc GitHub/SPM release.
+# When pre_release is false, the same run also publishes CocoaPods; pre_release true keeps it SPM-only.
+
+on:
+  workflow_dispatch:
+    inputs:
+      webrtc_release_url:
+        description: "Upstream GetStream/webrtc release URL, e.g. https://github.com/GetStream/webrtc/releases/tag/145.1"
+        required: true
+      pre_release:
+        description: "Mark the GitHub release as a pre-release and skip CocoaPods publishing"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  prepare:
+    name: Prepare WebRTC artifacts
+    runs-on: macos-26
+    outputs:
+      tag: ${{ steps.resolve_webrtc_release.outputs.tag }}
+    steps:
+      - name: Connect Bot
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4.1.1
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.2
+          bundler-cache: true
+
+      - name: Resolve WebRTC release
+        id: resolve_webrtc_release
+        env:
+          WEBRTC_RELEASE_URL: ${{ inputs.webrtc_release_url }}
+        run: |
+          ruby <<'RUBY'
+          require 'uri'
+
+          uri = URI.parse(ENV.fetch('WEBRTC_RELEASE_URL'))
+          release_path = '/GetStream/webrtc/releases/tag/'
+          unless uri.scheme == 'https' && uri.host == 'github.com' && uri.path.start_with?(release_path)
+            abort('WebRTC release URL must be under https://github.com/GetStream/webrtc/releases/tag/')
+          end
+
+          tag = uri.path.delete_prefix(release_path).chomp('/')
+          abort('WebRTC release URL must include a tag') if tag.empty? || tag.include?('/')
+
+          download_url = "https://github.com/GetStream/webrtc/releases/download/#{tag}/WebRTC.xcframework.zip"
+          File.open(ENV.fetch('GITHUB_OUTPUT'), 'a') do |file|
+            file.puts("tag=#{tag}")
+            file.puts("download_url=#{download_url}")
+          end
+          RUBY
+
+      - name: "Fastlane - Prepare WebRTC artifacts"
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
+        run: bundle exec fastlane prepare_release_from_url webrtc_xcframework_url:"${{ steps.resolve_webrtc_release.outputs.download_url }}" --verbose
+        timeout-minutes: 30
+
+      - uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: ${{ job.status }}
+          text: |
+            ❌ StreamVideoWebRTC release failed! 🚢
+
+            Flow: Publish from WebRTC
+            Job: Prepare WebRTC artifacts
+            WebRTC release URL: ${{ inputs.webrtc_release_url }}
+            Pre-release: ${{ inputs.pre_release }}
+
+            cc: <!subteam^S05RBQ69U1H>
+          fields: repo
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: StreamWebRTC.xcframework.zip
+          path: fastlane/StreamWebRTC.xcframework.zip
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: WebRTC.xcframework.zip
+          path: fastlane/WebRTC.xcframework.zip
+          retention-days: 7
+
+  release:
+    name: Publish new release
+    runs-on: macos-26
+    needs: prepare
+    steps:
+      - name: Connect Bot
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 0
+
+      - name: Download WebRTC
+        uses: actions/download-artifact@v4
+        with:
+          name: WebRTC.xcframework.zip
+          path: fastlane/
+
+      - name: Download StreamWebRTC
+        uses: actions/download-artifact@v4
+        with:
+          name: StreamWebRTC.xcframework.zip
+          path: fastlane/
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.2
+          bundler-cache: true
+
+      - name: "Fastlane - Publish Release"
+        env:
+          GITHUB_TOKEN: ${{ secrets.CI_BOT_GITHUB_TOKEN }}
+          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
+        run: bundle exec fastlane release version:"${{ needs.prepare.outputs.tag }}" pre_release:${{ inputs.pre_release }} webrtc_release_url:"${{ inputs.webrtc_release_url }}" --verbose
+        timeout-minutes: 20
+
+      - uses: 8398a7/action-slack@v3
+        if: failure()
+        with:
+          status: ${{ job.status }}
+          text: |
+            ❌ StreamVideoWebRTC release failed! 🚢
+
+            Flow: Publish from WebRTC
+            Job: Publish release
+            Version: ${{ needs.prepare.outputs.tag }}
+            WebRTC release URL: ${{ inputs.webrtc_release_url }}
+            Pre-release: ${{ inputs.pre_release }}
+
+            cc: <!subteam^S05RBQ69U1H>
+          fields: repo
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            🎉 StreamVideoWebRTC release has been shipped! 🚢
+
+            Flow: Publish from WebRTC
+            Version: ${{ needs.prepare.outputs.tag }}
+            WebRTC release URL: ${{ inputs.webrtc_release_url }}
+            Pre-release: ${{ inputs.pre_release }}
+
+            cc: <!subteam^S05RBQ69U1H>
+          fields: repo
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
