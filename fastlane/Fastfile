@@ -208,9 +208,9 @@ end
 
 private_lane :ensure_podspec_version do |options|
   podspec_version = File.read(podspec_path).match(/spec.version\s*=\s*"([^"]+)"/)&.[](1)
-  return if podspec_version == options[:version]
-
-  UI.user_error!("Podspec version #{podspec_version} does not match release version #{options[:version]}")
+  if podspec_version != options[:version]
+    UI.user_error!("Podspec version #{podspec_version} does not match release version #{options[:version]}")
+  end
 end
 
 private_lane :download_and_extract_xcframework do |options|
