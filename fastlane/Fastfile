@@ -147,15 +147,14 @@ end
 # Available options:
 # - version: The release version to publish to CocoaPods (required)
 #
-# Publishes only CocoaPods. The pods workflow must checkout the release tag first so the local podspec matches
-# the existing GitHub release assets.
+# Publishes only CocoaPods. The pods workflow restores the release tag's podspec before invoking this lane.
 lane :release_cocoapods do |options|
   UI.user_error!("You must specify an xcframework version") unless options[:version]
   version = sanitize_semver_version(version: options[:version])
   ensure_podspec_version(version: version)
 
   publish_ios_sdk(
-    # The pods workflow checks out the release tag first, so this pushes that tag's podspec without rebuilding.
+    # The pods workflow restores the release tag's podspec first, so this pushes that podspec without rebuilding.
     skip_pods: false,
     skip_spm: true,
     skip_branch_check: true,

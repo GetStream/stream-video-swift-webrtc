@@ -2,7 +2,7 @@ name: "Publish on Cocoapods"
 
 # Promotes an existing stream-video-swift-webrtc GitHub release to CocoaPods.
 # Use this after a pre-release has been validated through SPM. It extracts the version from the
-# release URL, checks out that exact tag, verifies the podspec version, and publishes only CocoaPods.
+# release URL, verifies the podspec version, and publishes only CocoaPods.
 # No xcframework build, signing, GitHub release creation, or Package.swift update happens here.
 
 on:
@@ -11,6 +11,11 @@ on:
       release_url:
         description: "Existing stream-video-swift-webrtc release URL to publish to CocoaPods"
         required: true
+      use_dispatch_branch:
+        description: "Run from the selected workflow branch and restore only the release tag podspec"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   release:
@@ -47,8 +52,19 @@ jobs:
       - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 0
-          # Publish the podspec from the exact release tag, not the current workflow branch.
-          ref: ${{ steps.resolve_release.outputs.version }}
+          # By default, publish from the exact release tag. For release recovery, use the
+          # selected dispatch branch so workflow/Fastfile fixes can run against an existing tag.
+          ref: ${{ inputs.use_dispatch_branch && github.ref || steps.resolve_release.outputs.version }}
+
+      - name: Restore release podspec
+        if: ${{ inputs.use_dispatch_branch }}
+        env:
+          VERSION: ${{ steps.resolve_release.outputs.version }}
+        run: |
+          # Keep the workflow and Fastfile from the selected dispatch branch, but publish the
+          # podspec that belongs to the immutable release tag.
+          git fetch --force --depth=1 origin "refs/tags/${VERSION}:refs/tags/${VERSION}"
+          git show "${VERSION}:StreamWebRTC.podspec" > StreamWebRTC.podspec
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
