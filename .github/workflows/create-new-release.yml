@@ -21,6 +21,10 @@ on:
         type: boolean
         default: false
 
+permissions:
+  actions: write
+  contents: write
+
 jobs:
   build:
     name: Build
