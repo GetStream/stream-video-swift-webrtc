@@ -8,6 +8,10 @@ on:
         required: true
         default: "main"
 
+permissions:
+  actions: write
+  contents: read
+
 jobs:
   build:
     name: Build
