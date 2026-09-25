@@ -5,6 +5,7 @@ require 'json'
 require 'net/http'
 require 'shellwords'
 require 'uri'
+require 'tmpdir'
 
 github_repo = ENV['GITHUB_REPOSITORY'] || 'GetStream/stream-video-swift-webrtc'
 sdk_name = 'WebRTC'
@@ -58,6 +59,7 @@ lane :prepare_release_from_url do |options|
   ['*.zip', '*.xcframework'].each { |f| sh("rm -rf #{f}") }
   xcframework_path = download_and_extract_xcframework(url: options[:webrtc_xcframework_url])
   modified_xcframework_path = clone_and_modify_xcframework(file_path: xcframework_path)
+  prepare_dsyms(url: options[:webrtc_xcframework_url], xcframework_path: xcframework_path)
 
   match_me
 
@@ -108,7 +110,7 @@ lane :release do |options|
   release_spm(
     version: version,
     changelog: changelog,
-    upload_assets: [zip_xcframework_path, zip_modified_xcframework_path],
+    upload_assets: [zip_xcframework_path, zip_modified_xcframework_path] + Dir.glob(File.expand_path('*WebRTC.dSYMs.zip')),
     pre_release: pre_release
   )
 
@@ -241,6 +243,33 @@ private_lane :download_and_extract_xcframework do |options|
   target_path
 end
 
+private_lane :prepare_dsyms do |options|
+  url = URI.join(options[:url], "#{sdk_name}.dSYMs.zip").to_s
+  Dir.mktmpdir('webrtc-dsyms') do |work_dir|
+    zip_path = File.join(work_dir, "#{sdk_name}.dSYMs.zip")
+    status = sh("curl --silent --show-error --location --output #{Shellwords.escape(zip_path)} --write-out '%{http_code}' #{Shellwords.escape(url)}").strip # rubocop:disable Style/FormatStringToken
+    if status == '404'
+      UI.message('Upstream release has no dSYMs; continuing without symbol assets')
+      next
+    end
+    UI.user_error!("dSYM download failed with HTTP #{status}") unless status == '200'
+    sh("ditto -x -k #{Shellwords.escape(zip_path)} #{Shellwords.escape(work_dir)}")
+    symbols_path = File.join(work_dir, "#{sdk_name}.dSYMs")
+    dwarf_files = Dir.glob("#{symbols_path}/**/*.dSYM/Contents/Resources/DWARF/#{sdk_name}")
+    UI.user_error!('The dSYM archive contains no WebRTC DWARF files') if dwarf_files.empty?
+
+    framework_files = Dir.glob("#{options[:xcframework_path]}/*/#{sdk_name}.framework/#{sdk_name}")
+    uuids = [framework_files, dwarf_files].map do |files|
+      files.flat_map { |file| sh("dwarfdump --uuid #{Shellwords.escape(file)}").scan(/UUID: (\S+) (\([^)]+\))/) }.sort
+    end
+    UI.user_error!('dSYM UUIDs do not match the WebRTC xcframework') unless uuids.first == uuids.last
+
+    modified_symbols_path = clone_and_modify_xcframework(file_path: symbols_path)
+    FileUtils.cp(zip_path, File.expand_path("#{sdk_name}.dSYMs.zip"))
+    FileUtils.mv(zip_xcframework(file_path: modified_symbols_path), File.expand_path("#{modified_sdk_name}.dSYMs.zip"))
+  end
+end
+
 private_lane :clone_and_modify_xcframework do |options|
   old_framework_path = File.expand_path(options[:file_path])
   new_framework_path = old_framework_path.gsub(/#{sdk_name}/, modified_sdk_name)
@@ -249,7 +278,7 @@ private_lane :clone_and_modify_xcframework do |options|
   sh("cp -R #{old_framework_path} #{new_framework_path}")
 
   # Rename all files with the old framework name with the new one
-  ["#{sdk_name}.framework", "#{sdk_name}.dSYM", "#{sdk_name}.h", sdk_name].each do |file_name|
+  ["#{sdk_name}.framework", "#{sdk_name}.framework.dSYM", "#{sdk_name}.dSYM", "#{sdk_name}.h", "#{sdk_name}.yml", sdk_name].each do |file_name|
     Dir.glob("#{new_framework_path}/**/*").each do |old_file_path|
       next unless File.basename(old_file_path) == file_name
 
@@ -274,7 +303,7 @@ private_lane :clone_and_modify_xcframework do |options|
   end
 
   # Rename the rpath for all the frameworks and update symlinks if required
-  framework_paths = new_framework_path.include?('.xcframework') ? Dir.glob("#{new_framework_path}/**/*.framework") : [new_framework_path]
+  framework_paths = new_framework_path.end_with?('.framework') ? [new_framework_path] : Dir.glob("#{new_framework_path}/**/*.framework")
   framework_paths.each do |path|
     Dir.chdir(path) do
       if File.symlink?(modified_sdk_name)
