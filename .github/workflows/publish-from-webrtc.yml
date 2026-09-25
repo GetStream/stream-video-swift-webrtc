@@ -27,6 +27,7 @@ jobs:
     runs-on: macos-26
     outputs:
       tag: ${{ steps.resolve_webrtc_release.outputs.tag }}
+      has_dsyms: ${{ steps.symbols.outputs.available }}
     steps:
       - name: Connect Bot
         uses: webfactory/ssh-agent@v0.7.0
@@ -71,6 +72,24 @@ jobs:
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
         run: bundle exec fastlane prepare_release_from_url webrtc_xcframework_url:"${{ steps.resolve_webrtc_release.outputs.download_url }}" --verbose
         timeout-minutes: 30
+
+      - name: Check optional dSYM assets
+        id: symbols
+        run: |
+          if [[ -f fastlane/WebRTC.dSYMs.zip && -f fastlane/StreamWebRTC.dSYMs.zip ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload dSYM assets
+        if: ${{ steps.symbols.outputs.available == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebRTC-dSYMs
+          path: |
+            fastlane/WebRTC.dSYMs.zip
+            fastlane/StreamWebRTC.dSYMs.zip
+          if-no-files-found: error
+          retention-days: 7
 
       - uses: 8398a7/action-slack@v3
         if: failure()
@@ -127,6 +146,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: StreamWebRTC.xcframework.zip
+          path: fastlane/
+
+      - name: Download dSYM assets
+        if: ${{ needs.prepare.outputs.has_dsyms == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: WebRTC-dSYMs
           path: fastlane/
 
       - name: Set up Ruby
