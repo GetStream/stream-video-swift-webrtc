@@ -3,7 +3,8 @@ name: "Publish from WebRTC"
 # Repackages an existing upstream GetStream/webrtc GitHub release without rebuilding WebRTC.
 # The workflow extracts the upstream tag, downloads WebRTC.xcframework.zip from that release,
 # signs/zips WebRTC and StreamWebRTC, then creates the stream-video-swift-webrtc GitHub/SPM release.
-# When pre_release is false, the same run also publishes CocoaPods; pre_release true keeps it SPM-only.
+# pre_release marks the GitHub release as a pre-release. The run publishes SPM only.
+# CocoaPods is published later, from an existing GitHub release, by Publish on Cocoapods.
 
 on:
   workflow_dispatch:
@@ -12,7 +13,7 @@ on:
         description: "Upstream GetStream/webrtc release URL, e.g. https://github.com/GetStream/webrtc/releases/tag/145.1"
         required: true
       pre_release:
-        description: "Mark the GitHub release as a pre-release and skip CocoaPods publishing"
+        description: "Mark the GitHub release as a pre-release"
         required: false
         type: boolean
         default: false
@@ -164,7 +165,6 @@ jobs:
       - name: "Fastlane - Publish Release"
         env:
           GITHUB_TOKEN: ${{ secrets.CI_BOT_GITHUB_TOKEN }}
-          COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
         run: bundle exec fastlane release version:"${{ needs.prepare.outputs.tag }}" pre_release:${{ inputs.pre_release }} webrtc_release_url:"${{ inputs.webrtc_release_url }}" --verbose

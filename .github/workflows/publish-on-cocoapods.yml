@@ -1,8 +1,10 @@
 name: "Publish on Cocoapods"
 
 # Promotes an existing stream-video-swift-webrtc GitHub release to CocoaPods.
-# Use this after a pre-release has been validated through SPM. It extracts the version from the
-# release URL, verifies the podspec version, and publishes only CocoaPods.
+# The upstream WebRTC trigger does not run this workflow.
+# CocoaPods has no prerelease flag. A GitHub pre-release is published only when its
+# version is already a CocoaPods pre-release (letter or hyphen, for example 1.2.3-beta.1).
+# A stable version marked pre-release on GitHub is skipped, because Trunk would ship it as final.
 # No xcframework build, signing, GitHub release creation, or Package.swift update happens here.
 
 on:
@@ -25,11 +27,6 @@ jobs:
     name: Publish Pods Version
     runs-on: macos-26
     steps:
-      - name: Connect Bot
-        uses: webfactory/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
-
       - name: Resolve release version
         id: resolve_release
         env:
@@ -52,7 +49,54 @@ jobs:
           end
           RUBY
 
+      - name: Read GitHub release
+        id: github_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.resolve_release.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release view "$VERSION" \
+            --repo GetStream/stream-video-swift-webrtc \
+            --json isDraft,isPrerelease \
+            --jq '"draft=\(.isDraft)\nprerelease=\(.isPrerelease)"' \
+            >> "$GITHUB_OUTPUT"
+
+      - name: Decide whether CocoaPods can publish this release
+        id: pods
+        env:
+          VERSION: ${{ steps.resolve_release.outputs.version }}
+          DRAFT: ${{ steps.github_release.outputs.draft }}
+          PRERELEASE: ${{ steps.github_release.outputs.prerelease }}
+        run: |
+          ruby <<'RUBY'
+          abort('GitHub release is still a draft') if ENV.fetch('DRAFT') == 'true'
+
+          version = ENV.fetch('VERSION').sub(/\+[0-9A-Za-z.\-]+\z/, '')
+          prerelease = ENV.fetch('PRERELEASE') == 'true'
+          # Same rule as CocoaPods Version#prerelease?: a letter or hyphen, after build metadata.
+          pods_prerelease = version.match?(/[A-Za-z\-]/)
+          publish = !prerelease || pods_prerelease
+          reason = if publish
+                     prerelease ? 'GitHub pre-release uses a CocoaPods pre-release version' : 'GitHub release is final'
+                   else
+                     'GitHub release is a pre-release and CocoaPods would publish this stable version as final'
+                   end
+
+          File.open(ENV.fetch('GITHUB_OUTPUT'), 'a') do |file|
+            file.puts("publish=#{publish}")
+            file.puts("reason=#{reason}")
+          end
+          RUBY
+
+      - name: Connect Bot
+        if: ${{ steps.pods.outputs.publish == 'true' }}
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
+
       - uses: actions/checkout@v4.1.1
+        if: ${{ steps.pods.outputs.publish == 'true' }}
         with:
           fetch-depth: 0
           # By default, publish from the exact release tag. For release recovery, use the
@@ -60,7 +104,7 @@ jobs:
           ref: ${{ inputs.use_dispatch_branch && github.ref || steps.resolve_release.outputs.version }}
 
       - name: Restore release podspec
-        if: ${{ inputs.use_dispatch_branch }}
+        if: ${{ steps.pods.outputs.publish == 'true' && inputs.use_dispatch_branch }}
         env:
           VERSION: ${{ steps.resolve_release.outputs.version }}
         run: |
@@ -70,18 +114,20 @@ jobs:
           git show "${VERSION}:StreamWebRTC.podspec" > StreamWebRTC.podspec
 
       - name: Set up Ruby
+        if: ${{ steps.pods.outputs.publish == 'true' }}
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.2
           bundler-cache: true
 
       - name: "Fastlane - Publish Pods"
+        if: ${{ steps.pods.outputs.publish == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.CI_BOT_GITHUB_TOKEN }}
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
-        run: bundle exec fastlane release_cocoapods version:"${{ steps.resolve_release.outputs.version }}" --verbose
+        run: bundle exec fastlane release_cocoapods version:"${{ steps.resolve_release.outputs.version }}" pre_release:${{ steps.github_release.outputs.prerelease }} --verbose
         timeout-minutes: 20
 
       - uses: 8398a7/action-slack@v3
@@ -94,6 +140,7 @@ jobs:
             Flow: Publish on Cocoapods
             Version: ${{ steps.resolve_release.outputs.version }}
             Release URL: ${{ inputs.release_url }}
+            Pre-release: ${{ steps.github_release.outputs.prerelease }}
 
             cc: <!subteam^S05RBQ69U1H>
           fields: repo
@@ -101,6 +148,24 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - uses: 8398a7/action-slack@v3
+        if: ${{ success() && steps.pods.outputs.publish == 'false' }}
+        with:
+          status: ${{ job.status }}
+          text: |
+            CocoaPods publish skipped.
+
+            Flow: Publish on Cocoapods
+            Version: ${{ steps.resolve_release.outputs.version }}
+            Release URL: ${{ inputs.release_url }}
+            Reason: ${{ steps.pods.outputs.reason }}
+
+            cc: <!subteam^S05RBQ69U1H>
+          fields: repo
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - uses: 8398a7/action-slack@v3
+        if: ${{ success() && steps.pods.outputs.publish == 'true' }}
         with:
           status: ${{ job.status }}
           text: |
@@ -109,6 +174,7 @@ jobs:
             Flow: Publish on Cocoapods
             Version: ${{ steps.resolve_release.outputs.version }}
             Release URL: ${{ inputs.release_url }}
+            Pre-release: ${{ steps.github_release.outputs.prerelease }}
 
             cc: <!subteam^S05RBQ69U1H>
           fields: repo
