@@ -77,7 +77,8 @@ end
 # - webrtc_release_url: The upstream WebRTC release URL this release was created from (optional)
 #
 # Bumps Package.swift and the podspec, commits the version change, and publishes the SPM/GitHub release.
-# Normal releases also publish CocoaPods; pre-releases stay SPM-only and can be promoted later with release_cocoapods.
+# CocoaPods Trunk is not updated here. Publish an existing GitHub release with the
+# Publish on Cocoapods workflow. pre_release only marks the GitHub release as a pre-release.
 #
 # Example usage:
 # bundle exec fastlane release version:125.6422.065 pre_release:false
@@ -96,7 +97,7 @@ lane :release do |options|
   checksum = sh("swift package compute-checksum #{zip_modified_xcframework_path}").strip
 
   update_swift_package(version: version, checksum: checksum)
-  # CocoaPods is published later from the release tag, so keep the podspec version in the same bump commit.
+  # The podspec stays aligned with the GitHub release for git consumers. Trunk is not updated.
   version_bump_podspec(path: podspec_path, version_number: version)
 
   sh('git add -A')
@@ -113,8 +114,6 @@ lane :release do |options|
     upload_assets: [zip_xcframework_path, zip_modified_xcframework_path] + Dir.glob(File.expand_path('*WebRTC.dSYMs.zip')),
     pre_release: pre_release
   )
-
-  release_cocoapods(version: version) unless pre_release
 end
 
 # Available options:
@@ -123,13 +122,12 @@ end
 # - upload_assets: The zipped xcframework assets to attach to the GitHub release (required)
 # - pre_release: Mark the GitHub release as a pre-release after creation (optional)
 #
-# Publishes only the GitHub/SPM release. It intentionally skips CocoaPods.
+# Publishes only the GitHub/SPM release.
 lane :release_spm do |options|
   UI.user_error!("You must specify an xcframework version") unless options[:version]
   UI.user_error!('You must specify upload assets') unless options[:upload_assets]
 
   publish_ios_sdk(
-    # SPM and CocoaPods are intentionally split. This lane only creates the GitHub release and SPM assets.
     skip_pods: true,
     skip_spm: false,
     skip_branch_check: true,
@@ -148,15 +146,24 @@ end
 
 # Available options:
 # - version: The release version to publish to CocoaPods (required)
+# - pre_release: The GitHub release prerelease flag (optional)
 #
-# Publishes only CocoaPods. The pods workflow restores the release tag's podspec before invoking this lane.
+# Publishes only CocoaPods for an existing release tag. The pods workflow checks out that tag's podspec.
+# CocoaPods has no prerelease flag: a prerelease pod is a version containing a letter or hyphen.
+# A stable version whose GitHub release is a prerelease is rejected, because Trunk would ship it as final.
 lane :release_cocoapods do |options|
   UI.user_error!("You must specify an xcframework version") unless options[:version]
-  version = sanitize_semver_version(version: options[:version])
+  requested = options[:version].to_s.strip
+  pre_release = [true, 'true'].include?(options[:pre_release])
+  pods_prerelease = cocoapods_prerelease_version?(version: requested)
+  if pre_release && !pods_prerelease
+    UI.user_error!("GitHub release #{requested} is a pre-release. CocoaPods would publish this stable version as a final pod.")
+  end
+
+  version = pods_prerelease ? requested : sanitize_semver_version(version: requested)
   ensure_podspec_version(version: version)
 
   publish_ios_sdk(
-    # The pods workflow restores the release tag's podspec first, so this pushes that podspec without rebuilding.
     skip_pods: false,
     skip_spm: true,
     skip_branch_check: true,
@@ -206,6 +213,11 @@ private_lane :update_swift_package do |options|
   end
 
   File.open(swift_package_path, 'w') { |file| file << file_data }
+end
+
+# CocoaPods Version#prerelease?: a letter or hyphen, ignoring +build metadata.
+private_lane :cocoapods_prerelease_version? do |options|
+  options[:version].to_s.strip.sub(/\+[0-9A-Za-z.\-]+\z/, '').match?(/[A-Za-z\-]/)
 end
 
 private_lane :ensure_podspec_version do |options|
