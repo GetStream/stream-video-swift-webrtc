@@ -17,8 +17,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "StreamWebRTC",
-            url: "https://github.com/GetStream/stream-video-swift-webrtc/releases/download/156.0.0/StreamWebRTC.xcframework.zip",
-            checksum: "0da805e1b5832117966acd5e3bafb8310ef21dbdb688b56319bd912dd7b44fc4"
+            url: "https://github.com/GetStream/stream-video-swift-webrtc/releases/download/156.0.1/StreamWebRTC.xcframework.zip",
+            checksum: "5bbe4676eaaca0a99ac5c18a31e7448fc0bbf580631273b4bbec3829498d83ee"
         ),
     ]
 )
