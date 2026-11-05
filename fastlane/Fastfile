@@ -128,13 +128,10 @@ lane :release_spm do |options|
   UI.user_error!('You must specify upload assets') unless options[:upload_assets]
 
   publish_ios_sdk(
-    skip_pods: true,
-    skip_spm: false,
     skip_branch_check: true,
     skip_git_status_check: false,
     github_repo: github_repo,
     sdk_names: [modified_sdk_name],
-    podspec_names: [modified_sdk_name],
     version: options[:version],
     changelog: options[:changelog],
     upload_assets: options[:upload_assets]
