@@ -25,7 +25,8 @@ permissions:
 jobs:
   prepare:
     name: Prepare WebRTC artifacts
-    runs-on: macos-26
+    runs-on:
+      group: stream-macos
     outputs:
       tag: ${{ steps.resolve_webrtc_release.outputs.tag }}
       has_dsyms: ${{ steps.symbols.outputs.available }}
@@ -125,7 +126,8 @@ jobs:
 
   release:
     name: Publish new release
-    runs-on: macos-26
+    runs-on:
+      group: stream-macos
     needs: prepare
     steps:
       - name: Connect Bot
