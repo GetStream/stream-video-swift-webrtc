@@ -164,9 +164,16 @@ jobs:
           ruby-version: 3.2
           bundler-cache: true
 
+      - name: Generate release bot token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.IOS_RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.IOS_RELEASE_BOT_PRIVATE_KEY }}
+
       - name: "Fastlane - Publish Release"
         env:
-          GITHUB_TOKEN: ${{ secrets.CI_BOT_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
         run: bundle exec fastlane release version:"${{ needs.prepare.outputs.tag }}" pre_release:${{ inputs.pre_release }} webrtc_release_url:"${{ inputs.webrtc_release_url }}" --verbose
