@@ -141,8 +141,7 @@ jobs:
           client-id: ${{ vars.IOS_RELEASE_BOT_CLIENT_ID }}
           private-key: ${{ secrets.IOS_RELEASE_BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: >-
-            ${{ github.event.repository.name }},stream-video-swift-webrtc
+          repositories: ${{ github.event.repository.name }}
 
       - name: "Fastlane - Publish Pods"
         if: ${{ steps.pods.outputs.publish == 'true' }}
