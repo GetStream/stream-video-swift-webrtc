@@ -38,7 +38,7 @@ jobs:
           client-id: ${{ vars.IOS_RELEASE_BOT_CLIENT_ID }}
           private-key: ${{ secrets.IOS_RELEASE_BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: ios-certificates,webrtc
+          repositories: ios-certificates
 
       - name: Connect Bot
         # Send SSH git URLs (match, WebRTC source) over HTTPS with the token.
@@ -150,7 +150,7 @@ jobs:
           client-id: ${{ vars.IOS_RELEASE_BOT_CLIENT_ID }}
           private-key: ${{ secrets.IOS_RELEASE_BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: ios-certificates,webrtc
+          repositories: ios-certificates
 
       - name: Connect Bot
         # Send SSH git URLs (match, WebRTC source) over HTTPS with the token.
