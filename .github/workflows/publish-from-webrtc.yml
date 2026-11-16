@@ -121,7 +121,7 @@ jobs:
             cc: <!subteam^S05RBQ69U1H>
           fields: repo
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_IOS_BOTS }}
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -221,7 +221,7 @@ jobs:
             cc: <!subteam^S05RBQ69U1H>
           fields: repo
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_IOS_BOTS }}
 
       - uses: 8398a7/action-slack@v3
         with:
@@ -237,4 +237,4 @@ jobs:
             cc: <!subteam^S05RBQ69U1H>
           fields: repo
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_IOS_BOTS }}
