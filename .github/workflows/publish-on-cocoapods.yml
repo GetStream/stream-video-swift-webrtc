@@ -89,11 +89,25 @@ jobs:
           end
           RUBY
 
+      - name: Generate bot token
+        id: bot-token
+        if: ${{ steps.pods.outputs.publish == 'true' }}
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.IOS_RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.IOS_RELEASE_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ios-certificates
+
       - name: Connect Bot
         if: ${{ steps.pods.outputs.publish == 'true' }}
-        uses: webfactory/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ secrets.BOT_SSH_PRIVATE_KEY }}
+        # Send SSH git URLs (match, WebRTC source) over HTTPS with the token.
+        run: >-
+          git config --global
+          url."https://x-access-token:${TOKEN}@github.com/GetStream/".insteadOf
+          "git@github.com:GetStream/"
+        env:
+          TOKEN: ${{ steps.bot-token.outputs.token }}
 
       - uses: actions/checkout@v4.1.1
         if: ${{ steps.pods.outputs.publish == 'true' }}
@@ -120,10 +134,19 @@ jobs:
           ruby-version: 3.2
           bundler-cache: true
 
+      - name: Generate release bot token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.IOS_RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.IOS_RELEASE_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
       - name: "Fastlane - Publish Pods"
         if: ${{ steps.pods.outputs.publish == 'true' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.CI_BOT_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           COCOAPODS_TRUNK_TOKEN: ${{ secrets.COCOAPODS_TRUNK_TOKEN }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           APPSTORE_API_KEY: ${{ secrets.APPSTORE_API_KEY }}
@@ -145,7 +168,7 @@ jobs:
             cc: <!subteam^S05RBQ69U1H>
           fields: repo
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_IOS_BOTS }}
 
       - uses: 8398a7/action-slack@v3
         if: ${{ success() && steps.pods.outputs.publish == 'false' }}
@@ -162,7 +185,7 @@ jobs:
             cc: <!subteam^S05RBQ69U1H>
           fields: repo
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_IOS_BOTS }}
 
       - uses: 8398a7/action-slack@v3
         if: ${{ success() && steps.pods.outputs.publish == 'true' }}
@@ -179,4 +202,4 @@ jobs:
             cc: <!subteam^S05RBQ69U1H>
           fields: repo
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_IOS_BOTS }}
