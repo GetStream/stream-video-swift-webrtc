@@ -28,7 +28,7 @@ permissions:
 jobs:
   build:
     name: Build
-    runs-on: macos-26
+    runs-on: { group: scaleway-macos }
     steps:
       - name: Generate bot token
         id: bot-token
@@ -116,7 +116,7 @@ jobs:
 
   release:
     name: Publish new release
-    runs-on: macos-26
+    runs-on: { group: scaleway-macos }
     needs: build
     if: ${{ !cancelled() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
     steps:
